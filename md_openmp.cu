@@ -4,7 +4,7 @@
 # include <iomanip>
 # include <ctime>
 # include <omp.h>
-
+# include "timer.h"
 using namespace std;
 
 int main ( int argc, char *argv[] );
@@ -19,6 +19,9 @@ void update ( int np, int nd, double pos[], double vel[], double f[],
   double acc[], double mass, double dt );
 
 //****************************************************************************80
+
+
+
 
 int main ( int argc, char *argv[] )
 
@@ -91,9 +94,7 @@ int main ( int argc, char *argv[] )
   cout << "  STEP_NUM, the number of time steps, is " << step_num << "\n";
   cout << "  DT, the size of each time step, is " << dt << "\n";;
 
-  cout << "\n";
-  cout << "  Number of processors available = " << omp_get_num_procs ( ) << "\n";
-  cout << "  Number of threads =              " << omp_get_max_threads ( ) << "\n";
+ 
 //
 //  Set the dimensions of the box.
 //
@@ -144,7 +145,7 @@ int main ( int argc, char *argv[] )
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
 
-  wtime = omp_get_wtime ( );
+  wtime = GetTimer();
 
   for ( step = 1; step <= step_num; step++ )
   {
@@ -162,7 +163,7 @@ int main ( int argc, char *argv[] )
     update ( np, nd, pos, vel, force, acc, mass, dt );
   }
 
-  wtime = omp_get_wtime ( ) - wtime;
+  wtime =GetTimer() - wtime;
   cout << "\n";
   cout << "  Elapsed cpu time for main computation:\n";
   cout << "  " << wtime << " seconds.\n";
@@ -185,81 +186,21 @@ int main ( int argc, char *argv[] )
 }
 //****************************************************************************80
 
-void compute ( int np, int nd, double pos[], double vel[], 
-  double mass, double f[], double *pot, double *kin )
+__global__ void compute ( int np, int nd, double *pos, double *vel, 
+    double mass, double *f, double *pot, double *kin ){
+    double d;
+    double d2;
+    int i;
+    int j;
+    int k;
+    double ke;
+    double pe;
+    double PI2 = 3.141592653589793 / 2.0;
+    double rij[3];
 
-//****************************************************************************80
-//
-//  Purpose:
-//
-//    COMPUTE computes the forces and energies.
-//
-//  Discussion:
-//
-//    The computation of forces and energies is fully parallel.
-//
-//    The potential function V(X) is a harmonic well which smoothly
-//    saturates to a maximum value at PI/2:
-//
-//      v(x) = ( sin ( min ( x, PI2 ) ) )**2
-//
-//    The derivative of the potential is:
-//
-//      dv(x) = 2.0 * sin ( min ( x, PI2 ) ) * cos ( min ( x, PI2 ) )
-//            = sin ( 2.0 * min ( x, PI2 ) )
-//
-//  Licensing:
-//
-//    This code is distributed under the GNU LGPL license. 
-//
-//  Modified:
-//
-//    21 November 2007
-//
-//  Author:
-//
-//    Original FORTRAN90 version by Bill Magro.
-//    C++ version by John Burkardt.
-//
-//  Parameters:
-//
-//    Input, int NP, the number of particles.
-//
-//    Input, int ND, the number of spatial dimensions.
-//
-//    Input, double POS[ND*NP], the position of each particle.
-//
-//    Input, double VEL[ND*NP], the velocity of each particle.
-//
-//    Input, double MASS, the mass of each particle.
-//
-//    Output, double F[ND*NP], the forces.
-//
-//    Output, double *POT, the total potential energy.
-//
-//    Output, double *KIN, the total kinetic energy.
-//
-{
-  double d;
-  double d2;
-  int i;
-  int j;
-  int k;
-  double ke;
-  double pe;
-  double PI2 = 3.141592653589793 / 2.0;
-  double rij[3];
-
-  pe = 0.0;
-  ke = 0.0;
-
-# pragma omp parallel \
-  shared ( f, nd, np, pos, vel ) \
-  private ( i, j, k, rij, d, d2 )
-  
-
-# pragma omp for reduction ( + : pe, ke )
-  for ( k = 0; k < np; k++ )
+    pe = 0.0;
+    ke = 0.0;
+    for ( k = 0; k < np; k++ )
   {
 //
 //  Compute the potential energy and forces.
@@ -307,9 +248,7 @@ void compute ( int np, int nd, double pos[], double vel[],
   
   *pot = pe;
   *kin = ke;
-
-  return;
-}
+  }
 //****************************************************************************80
 
 double dist ( int nd, double r1[], double r2[], double dr[] )
@@ -547,8 +486,7 @@ void timestamp ( )
 }
 //****************************************************************************80
 
-void update ( int np, int nd, double pos[], double vel[], double f[], 
-  double acc[], double mass, double dt )
+
 
 //****************************************************************************80
 //
@@ -597,28 +535,15 @@ void update ( int np, int nd, double pos[], double vel[], double f[],
 //
 //    Input, double DT, the time step.
 //
-{
-  int i;
-  int j;
-  double rmass;
 
-  rmass = 1.0 / mass;
+__global__ void update_cu( int np, int nd, double *pos, double *vel, double* f, double* acc, double mass, double dt){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x; ;
+    double rmass;
 
-# pragma omp parallel \
-  shared ( acc, dt, nd, np, pos, rmass, vel ) \
-  private ( i, j )
-
-# pragma omp for
-
-  for ( j = 0; j < np; j++ )
-  {
-    for ( i = 0; i < nd; i++ )
-    {
-      pos[i+j*nd] = pos[i+j*nd] + vel[i+j*nd] * dt + 0.5 * acc[i+j*nd] * dt * dt;
-      vel[i+j*nd] = vel[i+j*nd] + 0.5 * dt * ( f[i+j*nd] * rmass + acc[i+j*nd] );
-      acc[i+j*nd] = f[i+j*nd] * rmass;
+    rmass = 1.0 / mass;
+    if(idx<np*nd){
+      pos[idx] = pos[idx]+vel[idx]*dt+0.5*acc[idx]*dt*dt;
+      vel[idx] = vel[idx] + 0.5 * dt * ( f[idx] * rmass + acc[idx] );
+      acc[idx] = f[idx] * rmass;
     }
   }
-
-  return;
-}
