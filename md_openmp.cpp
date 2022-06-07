@@ -6,6 +6,8 @@
 # include <omp.h>
 
 using namespace std;
+#define gridSize 128
+#define blockSize 512
 
 int main ( int argc, char *argv[] );
 void compute ( int np, int nd, double pos[], double vel[], 

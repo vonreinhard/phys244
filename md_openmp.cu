@@ -5,6 +5,11 @@
 # include <ctime>
 # include <omp.h>
 # include "timer.h"
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#define gridSize 128
+#define blockSize 512
+
 using namespace std;
 
 int main ( int argc, char *argv[] );
@@ -15,45 +20,24 @@ void initialize ( int np, int nd, double box[], int *seed, double pos[],
   double vel[], double acc[] );
 double r8_uniform_01 ( int *seed );
 void timestamp ( );
-void update ( int np, int nd, double pos[], double vel[], double f[], 
-  double acc[], double mass, double dt );
+
 
 //****************************************************************************80
 
+__global__ void update_cu( int np, int nd, double *pos, double *vel, double* f, double* acc, double mass, double dt){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x; ;
+    double rmass;
 
+    rmass = 1.0 / mass;
+    if(idx<np*nd){
+      pos[idx] = pos[idx]+vel[idx]*dt+0.5*acc[idx]*dt*dt;
+      vel[idx] = vel[idx] + 0.5 * dt * ( f[idx] * rmass + acc[idx] );
+      acc[idx] = f[idx] * rmass;
+    }
+  }
 
 
 int main ( int argc, char *argv[] )
-
-//****************************************************************************80
-//
-//  Purpose:
-//
-//    MAIN is the main program for MD_OPENMP.
-//
-//  Discussion:
-//
-//    MD implements a simple molecular dynamics simulation.
-//
-//    The program uses Open MP directives to allow parallel computation.
-//
-//    The velocity Verlet time integration scheme is used. 
-//
-//    The particles interact with a central pair potential.
-//
-//  Licensing:
-//
-//    This code is distributed under the GNU LGPL license. 
-//
-//  Modified:
-//
-//    30 July 2009
-//
-//  Author:
-//
-//    Original FORTRAN90 version by Bill Magro.
-//    C++ version by John Burkardt.
-//
 {
   double *acc;
   double *box;
@@ -160,7 +144,7 @@ int main ( int argc, char *argv[] )
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
-    update ( np, nd, pos, vel, force, acc, mass, dt );
+    update_cu << <gridSize, blockSize >> >( np, nd, pos, vel, force, acc, mass, dt );
   }
 
   wtime =GetTimer() - wtime;
@@ -186,21 +170,26 @@ int main ( int argc, char *argv[] )
 }
 //****************************************************************************80
 
-__global__ void compute ( int np, int nd, double *pos, double *vel, 
-    double mass, double *f, double *pot, double *kin ){
-    double d;
-    double d2;
-    int i;
-    int j;
-    int k;
-    double ke;
-    double pe;
-    double PI2 = 3.141592653589793 / 2.0;
-    double rij[3];
+void compute ( int np, int nd, double pos[], double vel[], 
+  double mass, double f[], double *pot, double *kin )
 
-    pe = 0.0;
-    ke = 0.0;
-    for ( k = 0; k < np; k++ )
+{
+  double d;
+  double d2;
+  int i;
+  int j;
+  int k;
+  double ke;
+  double pe;
+  double PI2 = 3.141592653589793 / 2.0;
+  double rij[3];
+
+  pe = 0.0;
+  ke = 0.0;
+
+
+
+  for ( k = 0; k < np; k++ )
   {
 //
 //  Compute the potential energy and forces.
@@ -248,7 +237,9 @@ __global__ void compute ( int np, int nd, double *pos, double *vel,
   
   *pot = pe;
   *kin = ke;
-  }
+
+  return;
+}
 //****************************************************************************80
 
 double dist ( int nd, double r1[], double r2[], double dr[] )
@@ -536,14 +527,4 @@ void timestamp ( )
 //    Input, double DT, the time step.
 //
 
-__global__ void update_cu( int np, int nd, double *pos, double *vel, double* f, double* acc, double mass, double dt){
-    int idx = blockIdx.x * blockDim.x + threadIdx.x; ;
-    double rmass;
 
-    rmass = 1.0 / mass;
-    if(idx<np*nd){
-      pos[idx] = pos[idx]+vel[idx]*dt+0.5*acc[idx]*dt*dt;
-      vel[idx] = vel[idx] + 0.5 * dt * ( f[idx] * rmass + acc[idx] );
-      acc[idx] = f[idx] * rmass;
-    }
-  }
