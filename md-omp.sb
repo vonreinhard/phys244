@@ -1,0 +1,22 @@
+#!/bin/bash
+## Example of OpenMP code running on a shared node
+#SBATCH --job-name="md_openmp_shared"
+#SBATCH --output="md_openmp_shared.%j.%N.out"
+#SBATCH --partition=shared
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=16G
+#SBATCH --export=ALL
+#SBATCH --account=csd453
+#SBATCH -t 00:30:00
+# PGI environment
+module purge
+module load slurm
+module load gpu
+module load pgi
+#SET the number of openmp threads
+export OMP_NUM_THREADS=16
+#Run the openmp job
+pgcc -fast -mp -Minfo=mp -o md_openmp.x md_openmp.c
+./md_openmp.x

@@ -1,10 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include "timer.h"
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+# include <math.h>
+# include <stdlib.h>
+# include <stdio.h>
+# include <time.h>
+# include <omp.h>
 
 int main ( int argc, char *argv[] );
 void compute ( int np, int nd, double pos[], double vel[], 
@@ -14,32 +12,46 @@ void initialize ( int np, int nd, double box[], int *seed, double pos[],
   double vel[], double acc[] );
 double r8_uniform_01 ( int *seed );
 void timestamp ( );
+void update ( int np, int nd, double pos[], double vel[], double f[], 
+  double acc[], double mass, double dt );
 
-#define gridSize 1
-#define blockSize 100
-__global__ void update ( int np, int nd, double* pos, double* vel, double* f, double* acc, double mass, double dt )
-{
- 
-  double rmass;
-
-  rmass = 1.0 / mass;
-
-
-
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  // printf("%8d\n",idx);
-  if(idx < (np*nd) ){
-
-    pos[idx] = pos[idx] + vel[idx] * dt + 0.5 * acc[idx] * dt * dt;
-    vel[idx] = vel[idx] + 0.5 * dt * ( f[idx] * rmass + acc[idx] );
-    acc[idx] = f[idx] * rmass;
-  }
-
-  return;
-}
 /******************************************************************************/
 
 int main ( int argc, char *argv[] )
+
+/******************************************************************************/
+/*
+  Purpose:
+
+    MAIN is the main program for MD_OPENMP.
+
+  Discussion:
+
+    MD implements a simple molecular dynamics simulation.
+
+    The program uses Open MP directives to allow parallel computation.
+
+    The velocity Verlet time integration scheme is used. 
+
+    The particles interact with a central pair potential.
+
+  Licensing:
+
+    This code is distributed under the GNU LGPL license. 
+
+  Modified:
+
+    30 July 2009
+
+  Author:
+
+    Original FORTRAN77 version by Bill Magro.
+    C version by John Burkardt.
+
+  Parameters:
+
+    None
+*/
 {
   double *acc;
   double *box;
@@ -80,7 +92,9 @@ int main ( int argc, char *argv[] )
   printf ( "  STEP_NUM, the number of time steps, is %d\n", step_num );
   printf ( "  DT, the size of each time step, is %f\n", dt );
 
-  
+  printf ( "\n" );
+  printf ( "  Number of processors available = %d\n", omp_get_num_procs ( ) );
+  printf ( "  Number of threads =              %d\n", omp_get_max_threads ( ) );
 /*
   Set the dimensions of the box.
 */
@@ -129,13 +143,7 @@ int main ( int argc, char *argv[] )
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
 
-  StartTimer();;
-  // parameter initialization
-  double* d_acc, *d_force,*d_pos,*d_vel;
-  cudaMalloc(&d_acc, nd * np * sizeof ( double ));
-  cudaMalloc(&d_force, nd * np * sizeof ( double ));
-  cudaMalloc(&d_pos, nd * np * sizeof ( double ));
-  cudaMalloc(&d_vel, nd * np * sizeof ( double ));
+  wtime = omp_get_wtime ( );
 
   for ( step = 1; step <= step_num; step++ )
   {
@@ -148,25 +156,16 @@ int main ( int argc, char *argv[] )
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
-    cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_force, force, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    printf ( "\n");
-    printf ( "%14f \n", pos[0]);
-    update<< <1, blockSize >> > ( np, nd, d_pos, d_vel, d_force, d_acc, mass, dt );
-
-    cudaMemcpy(pos, d_pos, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
-    cudaMemcpy(vel, d_vel, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
-    cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
-    cudaMemcpy(acc, d_acc, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     printf ( "%14f\n",pos[0] );
+    update ( np, nd, pos, vel, force, acc, mass, dt );
+    printf ( "%14f\n",pos[0] );
+    // printf ( "%8d\n",pos );
   }
-  //wtime = GetTimer() ;
+  wtime = omp_get_wtime ( ) - wtime;
 
   printf ( "\n" );
   printf ( "  Elapsed time for main computation:\n" );
-  //printf ( "  %f seconds.\n", wtime );
+  printf ( "  %f seconds.\n", wtime );
 /*
   Free memory.
 */
@@ -175,11 +174,6 @@ int main ( int argc, char *argv[] )
   free ( force );
   free ( pos );
   free ( vel );
-  // cuda
-  cudaFree ( d_acc );
-  cudaFree ( d_force );
-  cudaFree ( d_pos );
-  cudaFree ( d_vel );
 /*
   Terminate.
 */
@@ -195,6 +189,58 @@ int main ( int argc, char *argv[] )
 
 void compute ( int np, int nd, double pos[], double vel[], 
   double mass, double f[], double *pot, double *kin )
+
+/******************************************************************************/
+/*
+  Purpose:
+
+    COMPUTE computes the forces and energies.
+
+  Discussion:
+
+    The computation of forces and energies is fully parallel.
+
+    The potential function V(X) is a harmonic well which smoothly
+    saturates to a maximum value at PI/2:
+
+      v(x) = ( sin ( min ( x, PI2 ) ) )**2
+
+    The derivative of the potential is:
+
+      dv(x) = 2.0 * sin ( min ( x, PI2 ) ) * cos ( min ( x, PI2 ) )
+            = sin ( 2.0 * min ( x, PI2 ) )
+
+  Licensing:
+
+    This code is distributed under the GNU LGPL license. 
+
+  Modified:
+
+    21 November 2007
+
+  Author:
+
+    Original FORTRAN77 version by Bill Magro.
+    C version by John Burkardt.
+
+  Parameters:
+
+    Input, int NP, the number of particles.
+
+    Input, int ND, the number of spatial dimensions.
+
+    Input, double POS[ND*NP], the position of each particle.
+
+    Input, double VEL[ND*NP], the velocity of each particle.
+
+    Input, double MASS, the mass of each particle.
+
+    Output, double F[ND*NP], the forces.
+
+    Output, double *POT, the total potential energy.
+
+    Output, double *KIN, the total kinetic energy.
+*/
 {
   double d;
   double d2;
@@ -269,6 +315,36 @@ void compute ( int np, int nd, double pos[], double vel[],
 /******************************************************************************/
 
 double dist ( int nd, double r1[], double r2[], double dr[] )
+
+/******************************************************************************/
+/*
+  Purpose:
+
+    DIST computes the displacement (and its norm) between two particles.
+
+  Licensing:
+
+    This code is distributed under the GNU LGPL license. 
+
+  Modified:
+
+    21 November 2007
+
+  Author:
+
+    Original FORTRAN77 version by Bill Magro.
+    C version by John Burkardt.
+
+  Parameters:
+
+    Input, int ND, the number of spatial dimensions.
+
+    Input, double R1[ND], R2[ND], the positions of the particles.
+
+    Output, double DR[ND], the displacement vector.
+
+    Output, double D, the Euclidean norm of the displacement.
+*/
 {
   double d;
   int i;
@@ -426,6 +502,33 @@ double r8_uniform_01 ( int *seed )
 /******************************************************************************/
 
 void timestamp ( void )
+
+/******************************************************************************/
+/*
+  Purpose:
+
+    TIMESTAMP prints the current YMDHMS date as a time stamp.
+
+  Example:
+
+    31 May 2001 09:45:54 AM
+
+  Licensing:
+
+    This code is distributed under the GNU LGPL license. 
+
+  Modified:
+
+    24 September 2003
+
+  Author:
+
+    John Burkardt
+
+  Parameters:
+
+    None
+*/
 {
 # define TIME_SIZE 40
 
@@ -445,3 +548,77 @@ void timestamp ( void )
 }
 /******************************************************************************/
 
+void update ( int np, int nd, double pos[], double vel[], double f[], 
+  double acc[], double mass, double dt )
+
+/******************************************************************************/
+/*
+  Purpose:
+
+    UPDATE updates positions, velocities and accelerations.
+
+  Discussion:
+
+    The time integration is fully parallel.
+
+    A velocity Verlet algorithm is used for the updating.
+
+    x(t+dt) = x(t) + v(t) * dt + 0.5 * a(t) * dt * dt
+    v(t+dt) = v(t) + 0.5 * ( a(t) + a(t+dt) ) * dt
+    a(t+dt) = f(t) / m
+
+  Licensing:
+
+    This code is distributed under the GNU LGPL license. 
+
+  Modified:
+
+    17 April 2009
+
+  Author:
+
+    Original FORTRAN77 version by Bill Magro.
+    C version by John Burkardt.
+
+  Parameters:
+
+    Input, int NP, the number of particles.
+
+    Input, int ND, the number of spatial dimensions.
+
+    Input/output, double POS[ND*NP], the position of each particle.
+
+    Input/output, double VEL[ND*NP], the velocity of each particle.
+
+    Input, double F[ND*NP], the force on each particle.
+
+    Input/output, double ACC[ND*NP], the acceleration of each particle.
+
+    Input, double MASS, the mass of each particle.
+
+    Input, double DT, the time step.
+*/
+{
+  int i;
+  int j;
+  double rmass;
+
+  rmass = 1.0 / mass;
+
+# pragma omp parallel \
+  shared ( acc, dt, f, nd, np, pos, rmass, vel ) \
+  private ( i, j )
+
+# pragma omp for
+  for ( j = 0; j < np; j++ )
+  {
+    for ( i = 0; i < nd; i++ )
+    {
+      pos[i+j*nd] = pos[i+j*nd] + vel[i+j*nd] * dt + 0.5 * acc[i+j*nd] * dt * dt;
+      vel[i+j*nd] = vel[i+j*nd] + 0.5 * dt * ( f[i+j*nd] * rmass + acc[i+j*nd] );
+      acc[i+j*nd] = f[i+j*nd] * rmass;
+    }
+  }
+
+  return;
+}

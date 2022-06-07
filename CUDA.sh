@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name="cuda"
-#SBATCH --output="cuda_8192.%j.%N.out"
-#SBATCH --partition=gpu 
+#SBATCH --job-name="./md"
+#SBATCH --output="cuda.%j.%N.out"
+#SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=10
 #SBATCH --mem=96G
-#SBATCH --gpus=1
 #SBATCH --account=csd453
 #SBATCH --export=ALL
-#SBATCH -t 00:30:00
+#SBATCH --gpus =1
+#SBATCH -t 00:03:00
 
 
 
