@@ -3,8 +3,6 @@
 #include <string.h>
 #include <math.h>
 #include "timer.h"
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
 
 int main ( int argc, char *argv[] );
 void compute ( int np, int nd, double pos[], double vel[], 
@@ -15,7 +13,7 @@ void initialize ( int np, int nd, double box[], int *seed, double pos[],
 double r8_uniform_01 ( int *seed );
 void timestamp ( );
 
-#define gridSize 1
+#define gridSize 2
 #define blockSize 100
 __global__ void update ( int np, int nd, double* pos, double* vel, double* f, double* acc, double mass, double dt )
 {
@@ -37,6 +35,86 @@ __global__ void update ( int np, int nd, double* pos, double* vel, double* f, do
 
   return;
 }
+/*********************************/
+__global__ void set_f(double* f,int np,int nd){
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if(idx<np*nd){
+    f[idx] = 0.0;
+  }
+}
+__global__ void compute_cu ( int np, int nd, double* pos, double* f ){
+    double d=0;
+    double d2;
+    
+    double pe;
+    double PI2 = 3.141592653589793 / 2.0;
+    double rij[3];
+
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int k = idx/np;
+    int i = idx%np;
+    if(idx<np*nd){
+      
+      for(int j=0;j<np;j++){
+        if(j==k)continue;
+        //compute d
+     
+
+       
+        
+        
+        
+        d = sqrt ( d );
+
+        if ( d < PI2 ){
+          d2 = d;
+        }else{
+          d2 = PI2;
+        }
+
+        pe = pe + 0.5 * pow ( sin ( d2 ), 2 );
+        f[idx] = f[idx]- rij[i] * sin ( 2.0 * d2 ) / d;
+      }
+
+    }
+  }
+  
+// compute ke;
+/********************************************************************************/
+__global__  void add_ke(double *ke,double* vel,int np,int nd, double mass){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x*gridDim.x;
+    double sum = 0.0;
+    if(idx>=np*nd)return;
+    while(idx<np*nd){
+      sum+= vel[idx]*vel[idx];
+      
+      
+      idx +=stride;
+    }
+
+    int thIdx = threadIdx.x;
+    __shared__ float shArr[blockSize];
+    if(gridDim.x!=1)
+      shArr[thIdx] =sum;
+    else
+      shArr[thIdx] = ke[thIdx];
+    __syncthreads();
+    for(int size = blockSize/2;size>0;size/=2){
+    	if(thIdx<size)
+		    shArr[thIdx]+= shArr[thIdx+size];
+	    __syncthreads();
+    }
+    
+    ke[blockIdx.x] = shArr[0];
+
+    if(gridDim.x==1&&thIdx ==0){
+      
+      ke[0] *= 0.5*mass;
+      // printf("%14f %8d %8d,%8d\n",ke[0],gridDim.x,blockDim.x,blockIdx.x);
+    }
+ 
+}
 /******************************************************************************/
 
 int main ( int argc, char *argv[] )
@@ -55,7 +133,7 @@ int main ( int argc, char *argv[] )
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 20;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -131,16 +209,41 @@ int main ( int argc, char *argv[] )
 
   StartTimer();;
   // parameter initialization
-  double* d_acc, *d_force,*d_pos,*d_vel;
+  double* d_acc, *d_force,*d_pos,*d_vel,*d_kinetic,*ke;
   cudaMalloc(&d_acc, nd * np * sizeof ( double ));
   cudaMalloc(&d_force, nd * np * sizeof ( double ));
   cudaMalloc(&d_pos, nd * np * sizeof ( double ));
   cudaMalloc(&d_vel, nd * np * sizeof ( double ));
+  cudaMalloc(&ke, blockSize *sizeof ( double ));
+  d_kinetic = ( double * ) malloc (sizeof ( double ) );
+  // cudaMalloc(&d_kinetic, sizeof ( double ));
 
   for ( step = 1; step <= step_num; step++ )
   {
-    compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
+    cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_force, force, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
 
+    set_f<< <gridSize, blockSize >> > (d_force,np,nd);
+    // compute_cu<< <gridSize, blockSize >> > ( np, nd, d_pos, d_force);
+    compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
+    // compute ke
+    // printf("ttt\n");
+    add_ke<< <gridSize, blockSize >> >(ke,d_vel,np,nd,mass);
+    // if(gridSize>1)
+    //   add_ke<< <1, blockSize >> >(ke,ke,1,blockSize,mass);
+    double *tmp = ( double * ) malloc (blockSize*sizeof ( double ) );
+    cudaMemcpy(tmp, ke, blockSize*sizeof ( double ), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(d_kinetic, ke, sizeof ( double ), cudaMemcpyDeviceToHost);
+    double sum = 0;
+    for(int i=0;i<blockSize;i++){
+      sum+=tmp[i];
+    }
+    *d_kinetic = sum*0.5*mass;
+    if(*d_kinetic!=kinetic){
+      printf("%14f %14f \n",*d_kinetic,kinetic);
+    }
     if ( step == step_print )
     {
       printf ( "  %8d  %14f  %14f  %14e\n", step, potential, kinetic,
@@ -148,19 +251,19 @@ int main ( int argc, char *argv[] )
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
+   
     cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     cudaMemcpy(d_force, force, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    printf ( "\n");
-    printf ( "%14f \n", pos[0]);
-    update<< <1, blockSize >> > ( np, nd, d_pos, d_vel, d_force, d_acc, mass, dt );
+
+    update<< <gridSize, blockSize >> > ( np, nd, d_pos, d_vel, d_force, d_acc, mass, dt );
 
     cudaMemcpy(pos, d_pos, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     cudaMemcpy(vel, d_vel, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     cudaMemcpy(acc, d_acc, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
-    printf ( "%14f\n",pos[0] );
+    // printf ( "%14f\n",pos[0] );
   }
   //wtime = GetTimer() ;
 
@@ -175,11 +278,14 @@ int main ( int argc, char *argv[] )
   free ( force );
   free ( pos );
   free ( vel );
+  free ( d_kinetic );
   // cuda
   cudaFree ( d_acc );
   cudaFree ( d_force );
   cudaFree ( d_pos );
   cudaFree ( d_vel );
+  cudaFree ( ke );
+  
 /*
   Terminate.
 */
@@ -230,7 +336,8 @@ void compute ( int np, int nd, double pos[], double vel[],
       if ( k != j )
       {
         d = dist ( nd, pos+k*nd, pos+j*nd, rij );
-/*
+        
+/*  
   Attribute half of the potential energy to particle J.
 */
         if ( d < PI2 )

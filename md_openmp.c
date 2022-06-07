@@ -156,9 +156,9 @@ int main ( int argc, char *argv[] )
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
-    printf ( "%14f\n",pos[0] );
+    // printf ( "%14f\n",pos[0] );
     update ( np, nd, pos, vel, force, acc, mass, dt );
-    printf ( "%14f\n",pos[0] );
+    // printf ( "%14f\n",pos[0] );
     // printf ( "%8d\n",pos );
   }
   wtime = omp_get_wtime ( ) - wtime;
@@ -189,58 +189,6 @@ int main ( int argc, char *argv[] )
 
 void compute ( int np, int nd, double pos[], double vel[], 
   double mass, double f[], double *pot, double *kin )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    COMPUTE computes the forces and energies.
-
-  Discussion:
-
-    The computation of forces and energies is fully parallel.
-
-    The potential function V(X) is a harmonic well which smoothly
-    saturates to a maximum value at PI/2:
-
-      v(x) = ( sin ( min ( x, PI2 ) ) )**2
-
-    The derivative of the potential is:
-
-      dv(x) = 2.0 * sin ( min ( x, PI2 ) ) * cos ( min ( x, PI2 ) )
-            = sin ( 2.0 * min ( x, PI2 ) )
-
-  Licensing:
-
-    This code is distributed under the GNU LGPL license. 
-
-  Modified:
-
-    21 November 2007
-
-  Author:
-
-    Original FORTRAN77 version by Bill Magro.
-    C version by John Burkardt.
-
-  Parameters:
-
-    Input, int NP, the number of particles.
-
-    Input, int ND, the number of spatial dimensions.
-
-    Input, double POS[ND*NP], the position of each particle.
-
-    Input, double VEL[ND*NP], the velocity of each particle.
-
-    Input, double MASS, the mass of each particle.
-
-    Output, double F[ND*NP], the forces.
-
-    Output, double *POT, the total potential energy.
-
-    Output, double *KIN, the total kinetic energy.
-*/
 {
   double d;
   double d2;
@@ -275,8 +223,14 @@ void compute ( int np, int nd, double pos[], double vel[],
     {
       if ( k != j )
       {
-        d = dist ( nd, pos+k*nd, pos+j*nd, rij );
-/*
+        d = 0.0
+        for ( i = 0; i < nd; i++ )
+        {
+          rij[i] = pos[i+k*nd] - pos[i+j*nd];
+          d = d + rij[i] * rij[i];
+        }
+        d = sqrt ( d );
+/*  
   Attribute half of the potential energy to particle J.
 */
         if ( d < PI2 )
