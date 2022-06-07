@@ -81,39 +81,30 @@ __global__ void compute_cu ( int np, int nd, double* pos, double* f ){
   
 // compute ke;
 /********************************************************************************/
+__device__ void warpReduce(volatile double *sdata,int tid){
+  if(blockSize>=64)sdata[tid]+=sdata[tid+32];
+}
 __global__  void add_ke(double *ke,double* vel,int np,int nd, double mass){
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x*gridDim.x;
-    double sum = 0.0;
-    if(idx>=np*nd)return;
-    while(idx<np*nd){
-      sum+= vel[idx]*vel[idx];
-      
-      
-      idx +=stride;
+   __shared__ double sdata[blockSize];
+  int tid = threadIdx.x;
+  int i = blockIdx.x*blockDim.x+tid;
+  // int grid = blockSize*2*gridDim.x;
+  if(gridDim.x!=1)
+    sdata[tid] = vel[i]*vel[i];
+  else
+    sdata[tid] = ke[tid];
+  for(int s=1;s<blockDim.x;s*=2){
+    if(tid%(2*s)==0){
+      sdata[tid]+=sdata[tid+s];
     }
-
-    int thIdx = threadIdx.x;
-    __shared__ float shArr[blockSize];
-    if(gridDim.x!=1)
-      shArr[thIdx] =sum;
-    else
-      shArr[thIdx] = ke[thIdx];
     __syncthreads();
-    for(int size = blockSize/2;size>0;size/=2){
-    	if(thIdx<size)
-		    shArr[thIdx]+= shArr[thIdx+size];
-	    __syncthreads();
-    }
-    
-    ke[blockIdx.x] = shArr[0];
+  }
+  if(tid==0)ke[blockIdx.x]=sdata[0];
+  if(i==0&&gridDim.x==1)ke[i]*=0.5*mass;
+   
 
-    if(gridDim.x==1&&thIdx ==0){
-      
-      ke[0] *= 0.5*mass;
-      // printf("%14f %8d %8d,%8d\n",ke[0],gridDim.x,blockDim.x,blockIdx.x);
-    }
- 
+  
+  
 }
 /******************************************************************************/
 
@@ -138,7 +129,7 @@ int main ( int argc, char *argv[] )
   int step_print_index;
   int step_print_num;
   double *vel;
-  double wtime;
+  // double wtime;
 
   timestamp ( );
 
@@ -231,19 +222,14 @@ int main ( int argc, char *argv[] )
     // compute ke
     // printf("ttt\n");
     add_ke<< <gridSize, blockSize >> >(ke,d_vel,np,nd,mass);
-    // if(gridSize>1)
-    //   add_ke<< <1, blockSize >> >(ke,ke,1,blockSize,mass);
-    double *tmp = ( double * ) malloc (blockSize*sizeof ( double ) );
-    cudaMemcpy(tmp, ke, blockSize*sizeof ( double ), cudaMemcpyDeviceToHost);
-    // cudaMemcpy(d_kinetic, ke, sizeof ( double ), cudaMemcpyDeviceToHost);
-    double sum = 0;
-    for(int i=0;i<blockSize;i++){
-      sum+=tmp[i];
-    }
-    *d_kinetic = sum*0.5*mass;
-    if(*d_kinetic!=kinetic){
-      printf("%14f %14f \n",*d_kinetic,kinetic);
-    }
+    if(gridSize>1)
+      add_ke<< <1, blockSize >> >(ke,ke,1,blockSize,mass);
+    // double *tmp = ( double * ) malloc (blockSize*sizeof ( double ) );
+    // cudaMemcpy(tmp, ke, blockSize*sizeof ( double ), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&kinetic, ke, sizeof ( double ), cudaMemcpyDeviceToHost);
+    // if(*d_kinetic!=kinetic){
+    //   printf("%.14f %.14f \n",*d_kinetic,kinetic);
+    // }
     if ( step == step_print )
     {
       printf ( "  %8d  %14f  %14f  %14e\n", step, potential, kinetic,
@@ -315,12 +301,7 @@ void compute ( int np, int nd, double pos[], double vel[],
   pe = 0.0;
   ke = 0.0;
 
-# pragma omp parallel \
-  shared ( f, nd, np, pos, vel ) \
-  private ( i, j, k, rij, d, d2 )
-  
 
-# pragma omp for reduction ( + : pe, ke )
   for ( k = 0; k < np; k++ )
   {
 /*
