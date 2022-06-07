@@ -62,12 +62,12 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 10;
+  int np = 100;
   double *pos;
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 20;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -148,7 +148,7 @@ int main ( int argc, char *argv[] )
   for ( step = 1; step <= step_num; step++ )
   {
     compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
-
+    
     if ( step == step_print )
     {
       printf ( "  %8d  %14f  %14f  %14e\n", step, potential, kinetic,
@@ -223,13 +223,8 @@ void compute ( int np, int nd, double pos[], double vel[],
     {
       if ( k != j )
       {
-        d = 0.0
-        for ( i = 0; i < nd; i++ )
-        {
-          rij[i] = pos[i+k*nd] - pos[i+j*nd];
-          d = d + rij[i] * rij[i];
-        }
-        d = sqrt ( d );
+        d = dist ( nd, pos+k*nd, pos+j*nd, rij );
+        
 /*  
   Attribute half of the potential energy to particle J.
 */

@@ -1,14 +1,14 @@
 compute:
-    263, Parallel region activated
+    212, Parallel region activated
          Parallel loop activated with static block schedule
-    305, Parallel region terminated
+    255, Parallel region terminated
          Barrier
 update:
-    612, Parallel region activated
+    562, Parallel region activated
          Parallel loop activated with static block schedule
-    620, Parallel region terminated
+    570, Parallel region terminated
          Barrier
-06 June 2022 08:48:13 PM
+07 June 2022 10:25:10 AM
 
 MD_OPENMP
   C/OpenMP version
@@ -34,41 +34,21 @@ MD_OPENMP
                 Energy P        Energy K       Relative Energy Error
 
          0     4937.095643        0.000000    0.000000e+00
-   4937.095643
-         2     4937.095643        0.000000    1.393027e-11
-   4937.095643
-   4937.095643
-         4     4937.095642        0.000002    1.393027e-11
-   4937.095642
-   4937.095642
-         6     4937.095638        0.000006    1.393009e-11
-   4937.095638
-   4937.095638
-         8     4937.095632        0.000012    1.393009e-11
-   4937.095632
-   4937.095632
-        10     4937.095624        0.000020    1.392990e-11
-   4937.095624
-   4937.095624
+         2     4937.095643        0.000000    1.393009e-11
+         4     4937.095642        0.000002    1.392990e-11
+         6     4937.095638        0.000006    1.392990e-11
+         8     4937.095632        0.000012    1.392990e-11
+        10     4937.095624        0.000020    1.392972e-11
         12     4937.095613        0.000030    1.392953e-11
-   4937.095613
-   4937.095613
         14     4937.095600        0.000043    1.392898e-11
-   4937.095600
-   4937.095600
-        16     4937.095586        0.000058    1.392843e-11
-   4937.095586
-   4937.095586
-        18     4937.095568        0.000075    1.392769e-11
-   4937.095568
-   4937.095568
-        20     4937.095549        0.000094    1.392640e-11
-   4937.095549
+        16     4937.095586        0.000058    1.392824e-11
+        18     4937.095568        0.000075    1.392732e-11
+        20     4937.095549        0.000094    1.392603e-11
 
   Elapsed time for main computation:
-  0.013647 seconds.
+  0.189627 seconds.
 
 MD_OPENMP
   Normal end of execution.
 
-06 June 2022 08:48:13 PM
+07 June 2022 10:25:10 AM
