@@ -41,15 +41,13 @@ __global__ void update ( int np, int nd, double* pos, double* vel, double* f, do
 __global__ void compute_rd ( int np, int nd, double* pos,int j,double *d,double *rij){
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride = gridDim.x*blockDim.x;
-  int i ;
   int k;
   if(idx>=np*nd)return;
 
   while(idx<np*nd){
-    i = idx % nd;
     k = idx / nd;
     if(k!=j){
-      rij[idx] = pos[idx] - pos[i+j*nd];
+      rij[idx] = pos[idx] - pos[idx-nd*(k-j)];
       d[idx]= rij[idx]*rij[idx];
       
 
@@ -64,7 +62,7 @@ __global__ void compute_d2 ( int np, int nd,double *d,double *d2,double *pe){
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   double PI2 = 3.141592653589793 / 2.0;
   int stride = gridDim.x*blockDim.x;
-
+  if(idx>=np*nd)return;
   while(idx<np){
     
     
@@ -172,7 +170,7 @@ int main ( int argc, char *argv[] )
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 10;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -237,6 +235,13 @@ int main ( int argc, char *argv[] )
     compute ( np, nd, pos, vel, mass, force, &potential, &kinetic,j );
   }
 
+  add_ke<< <gridSize, blockSize >> >(ke,d_vel,np,nd,mass);
+  if(gridSize>1)
+    add_ke<< <1, blockSize >> >(ke,ke,1,blockSize,mass);
+  double tmp;
+  cudaMemcpy(&tmp, ke, sizeof ( double ), cudaMemcpyDeviceToHost);
+  kinetic = tmp;
+  
   e0 = potential + kinetic;
   printf("%8f\n",e0);
 /*
@@ -398,7 +403,12 @@ void compute ( int np, int nd, double pos[], double vel[],
   {
     if ( k != j )
     {
-      d = dist ( nd, pos+k*nd, pos+j*nd, rij );
+      d = 0.0;
+      for ( i = 0; i < nd; i++ ){
+        rij[i] = pos[i+k*nd] - pos[i+j*nd];
+        d = d + rij[i] * rij[i];
+      }
+      d = sqrt ( d );
       
 /*  
 Attribute half of the potential energy to particle J.
