@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name="cuda"
 #SBATCH --output="cuda.%j.%N.out"
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu-debug
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=10
 #SBATCH --mem=96G

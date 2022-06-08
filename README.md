@@ -1,43 +1,45 @@
 # Credit
+
+## OpenMP code author
+
 Mark Harris - NVIDIA Corporation
+
 Andreas Goetz - SDSC: OMP code and minor modifications
 
+## CUDA rrewrite author
+
+TzuKao Wang - UCSD Grad Student
+
 # Description
-A simple Jacobi iteration useful for teaching both the kerenels (or parallel) 
-and data directives. There is some high-level timing code built-in to the 
-program, but you may wish to also make use of a profiler when using this
-example.
+
 
 # Files
 
 Miscellaneous:  
 `timer.h` - simple timing code
 
-Exercise:  
-`jacobi.c`   - The serial C code lacking any OpenACC constructs  
-`jacobi.f90` - The serial Fortran code lacking any OpenACC constructs  
+Original:  
+`md_openmp.c`   - The serial C code use OpenMP 
 
-`jacobi-omp.c`   - OpenMP parallel C code  
-`jacobi-omp.f90` - OpenMP parallel Fortran code
+Our Work:  
+`md_openmp.cu`   - CUDA parallel C code  
 
-Solution:  
-`jacobi-acc.c` - A simple OpenACC C ccelerated version of the code.
-`jacobi-acc.f90` - A simple OpenACC Fortran accelerated version of the code.
+Script:  
+`CUDA.sb` - A simple script to running cuda version of our work.
 
+`md-omp.sb` - A simple script to running openmp version of our work.
+# OpenMP
 Compile:  
 Using the PGI compiler
 
-    # CPU serial version
-    pgcc -fast -o jacobi-pgcc.x jacobi.c
-    pgf90 -fast -o jacobi-pgf90.x jacobi.f90
-
-    # CPU OpenMP parallel version
-    pgcc -fast -mp -Minfo=mp -o jacobi-pgcc-omp.x jacobi-omp.c
-    pgf90 -fast -mp -Minfo=mp -o jacobi-pgf90-omp.x jacobi-omp.f90
-
-    # GPU OpenACC version
-    pgcc -acc -Minfo=accel -o jacobi-pgcc-acc.x jacobi-acc.c
-    pgf90 -acc -Minfo=accel -o jacobi-pgf90-acc.x jacobi-acc.f90
+    # OpenMP serail command
+    module purge
+    module load slurm
+    module load gpu
+    module load pgi
+    export OMP_NUM_THREADS=16
+    pgcc -fast -mp -Minfo=mp -o md_openmp.x md_openmp.c
+    ./md_openmp.x
 
 # CUDA part
 To run CUDA version interactively, you need to do following commands: 
@@ -47,5 +49,6 @@ To run CUDA version interactively, you need to do following commands:
     module load slurm
     module load gpu
     module load cuda
-    nvcc md_openmp.cu -o md.o
+    nvcc CUDA/md_openmp.cu -o md.o
+    ./md.o
 
