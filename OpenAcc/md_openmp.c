@@ -1,10 +1,8 @@
 # include <math.h>
-#include <string.h>
-#include <openacc.h>
 # include <stdlib.h>
 # include <stdio.h>
-#include "../timer.h"
-#include <time.h>
+# include <time.h>
+# include <omp.h>
 
 int main ( int argc, char *argv[] );
 void compute ( int np, int nd, double pos[], double vel[], 
@@ -20,6 +18,40 @@ void update ( int np, int nd, double pos[], double vel[], double f[],
 /******************************************************************************/
 
 int main ( int argc, char *argv[] )
+
+/******************************************************************************/
+/*
+  Purpose:
+
+    MAIN is the main program for MD_OPENMP.
+
+  Discussion:
+
+    MD implements a simple molecular dynamics simulation.
+
+    The program uses Open MP directives to allow parallel computation.
+
+    The velocity Verlet time integration scheme is used. 
+
+    The particles interact with a central pair potential.
+
+  Licensing:
+
+    This code is distributed under the GNU LGPL license. 
+
+  Modified:
+
+    30 July 2009
+
+  Author:
+
+    Original FORTRAN77 version by Bill Magro.
+    C version by John Burkardt.
+
+  Parameters:
+
+    None
+*/
 {
   double *acc;
   double *box;
@@ -40,6 +72,7 @@ int main ( int argc, char *argv[] )
   int step_print_index;
   int step_print_num;
   double *vel;
+  double wtime;
 
   timestamp ( );
 
@@ -59,6 +92,9 @@ int main ( int argc, char *argv[] )
   printf ( "  STEP_NUM, the number of time steps, is %d\n", step_num );
   printf ( "  DT, the size of each time step, is %f\n", dt );
 
+  printf ( "\n" );
+  printf ( "  Number of processors available = %d\n", omp_get_num_procs ( ) );
+  printf ( "  Number of threads =              %d\n", omp_get_max_threads ( ) );
 /*
   Set the dimensions of the box.
 */
@@ -107,7 +143,7 @@ int main ( int argc, char *argv[] )
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
 
-  GetTimer();
+  wtime = omp_get_wtime ( );
 
   for ( step = 1; step <= step_num; step++ )
   {
@@ -120,16 +156,16 @@ int main ( int argc, char *argv[] )
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
-    // printf ( "%14f\n",pos[0] );
+    printf ( "%14f\n",pos[0] );
     update ( np, nd, pos, vel, force, acc, mass, dt );
-    // printf ( "%14f\n",pos[0] );
+    printf ( "%14f\n",pos[0] );
     // printf ( "%8d\n",pos );
   }
-  double runtime = GetTimer();
+  wtime = omp_get_wtime ( ) - wtime;
 
   printf ( "\n" );
   printf ( "  Elapsed time for main computation:\n" );
-  printf ( "  %f seconds.\n", runtime/1000 );
+  printf ( "  %f seconds.\n", wtime );
 /*
   Free memory.
 */
