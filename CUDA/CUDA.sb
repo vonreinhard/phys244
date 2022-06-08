@@ -17,8 +17,7 @@ module purge
 module load slurm
 module load gpu
 module load cuda
-## Example of OpenMP code running on a shared node
-#SET the number of openmp thread
+nvcc CUDA/md_openmp.cu -o md.o
 #
 for i in 1
 do
