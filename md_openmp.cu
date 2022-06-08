@@ -48,7 +48,7 @@ __global__ void compute_rd ( int np, int nd, double* pos,int j,double *d,double 
     k = idx / nd;
     if(k!=j){
       rij[idx] = pos[idx] - pos[idx-nd*(k-j)];
-      d[idx]= rij[idx]*rij[idx];
+      d[idx] = rij[idx]*rij[idx];
       
 
 
@@ -62,9 +62,8 @@ __global__ void compute_d2 ( int np, int nd,double *d,double *d2,double *pe){
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   double PI2 = 3.141592653589793 / 2.0;
   int stride = gridDim.x*blockDim.x;
-  if(idx>=np*nd)return;
+  if(idx>=np)return;
   while(idx<np){
-    
     
     d[idx*nd] += d[idx*nd+1]+d[idx*nd+2];
     d[idx*nd] = sqrt( d[idx*nd]);
@@ -223,7 +222,7 @@ int main ( int argc, char *argv[] )
   cudaMalloc(&d_vel, nd * np * sizeof ( double ));
   cudaMalloc(&ke, blockSize *sizeof ( double ));
   cudaMalloc(&rij, nd * np *sizeof ( double ));
-  cudaMalloc(&pe, nd * np *sizeof ( double ));
+  cudaMalloc(&pe, np *sizeof ( double ));
   cudaMalloc(&d, nd * np *sizeof ( double ));
   cudaMalloc(&d2, np *sizeof ( double ));
   // compute sth
@@ -295,16 +294,16 @@ int main ( int argc, char *argv[] )
       compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
       compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
       compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij);
-      add_pe<< <gridSize, blockSize >> >(pe,np,nd);
-      if(gridSize>1)
-        add_pe<< <1, blockSize >> >(pe,1,blockSize);
+      add_pe<< <gridSize, blockSize >> >(pe,1,np);
+      // if(gridSize>1)
+      //   add_pe<< <1, blockSize >> >(pe,1,blockSize);
       double tmp_pe;
       cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
       total_pe += tmp_pe;
 
       // printf("%8f %8f\n",total_pe,potential);
     }
-
+    potential = total_pe;
     
   
     
