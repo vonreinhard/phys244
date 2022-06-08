@@ -62,12 +62,12 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 20;
+  int np = 10;
   double *pos;
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 10;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -118,6 +118,7 @@ int main ( int argc, char *argv[] )
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
+  printf("%8f\n",e0);
 /*
   This is the main time stepping loop:
     Compute forces and energies,
@@ -138,7 +139,7 @@ int main ( int argc, char *argv[] )
   step_print_num = 10;
   
   step = 0;
-  printf ( "  %8d  %14f  %14f  %14e\n",
+  printf ( "  %8d  %14.10f  %14.10f  %14.10e\n",
     step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
@@ -151,8 +152,8 @@ int main ( int argc, char *argv[] )
     
     if ( step == step_print )
     {
-      printf ( "  %8d  %14f  %14f  %14e\n", step, potential, kinetic,
-       ( potential + kinetic - e0 ) / e0 );
+      printf ( "  %8d  %14.10f  %14.10f  %14.10e\n",
+    step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }

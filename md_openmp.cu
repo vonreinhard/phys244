@@ -168,12 +168,12 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 50;
+  int np = 10;
   double *pos;
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 10;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -222,6 +222,7 @@ int main ( int argc, char *argv[] )
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
+  printf("%8f\n",e0);
 /*
   This is the main time stepping loop:
     Compute forces and energies,
@@ -242,7 +243,7 @@ int main ( int argc, char *argv[] )
   step_print_num = 10;
   
   step = 0;
-  printf ( "  %8d  %14f  %14f  %14e\n",
+  printf ( "  %8d  %14.10f  %14.10f  %14.10e\n",
     step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
@@ -269,7 +270,7 @@ int main ( int argc, char *argv[] )
     cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
 
     cudaMemset(&d_force,0.0,nd * np * sizeof ( double ));
-    double total_pe = 0.0;
+    // double total_pe = 0.0;
     // for(int j=0;j<np;j++){
     //   compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
     //   compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
@@ -299,8 +300,8 @@ int main ( int argc, char *argv[] )
     kinetic = tmp;
     if ( step == step_print )
     {
-      printf ( "  %8d  %14f  %14f  %14e\n", step, potential, kinetic,
-       ( potential + kinetic - e0 ) / e0 );
+      printf ( "  %8d  %14.10f  %14.10f  %14.10e\n",
+    step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
@@ -365,12 +366,13 @@ void compute ( int np, int nd, double pos[], double vel[],
   int i;
   int j;
   int k;
+  double ke;
   double pe;
   double PI2 = 3.141592653589793 / 2.0;
   double rij[3];
 
   pe = 0.0;
-
+  ke = 0.0;
 
 
   for ( k = 0; k < np; k++ )
@@ -409,10 +411,12 @@ void compute ( int np, int nd, double pos[], double vel[],
         }
       }
     }
-
+/*
+  Compute the kinetic energy.
+*/
+    
   }
 
- 
   
   *pot = pe;
 
@@ -596,4 +600,3 @@ void timestamp ( void )
 # undef TIME_SIZE
 }
 /******************************************************************************/
-
