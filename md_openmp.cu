@@ -13,8 +13,8 @@ void initialize ( int np, int nd, double box[], int *seed, double pos[],
 double r8_uniform_01 ( int *seed );
 void timestamp ( );
 
-#define gridSize 2
-#define blockSize 100
+#define gridSize 4
+#define blockSize 1024
 __global__ void update ( int np, int nd, double* pos, double* vel, double* f, double* acc, double mass, double dt )
 {
  
@@ -95,14 +95,12 @@ __global__ void compute_f ( int np, int nd,double *d,double *d2,double *f,double
     
 }
 /********************************************************************************/
-__global__  void add_pe(double *pe,int np,int nd){
+__global__  void add_pe(double *pe,int np,int nd,double *OUT,int j){
   __shared__ double sdata[1000];
  int tid = threadIdx.x;
  int i = blockIdx.x*blockDim.x+tid;
-//  printf("%8d\n",i);
-  sdata[tid] = 0;
+ sdata[tid] = 0;
  if(i>=np*nd)return;
- // int grid = blockSize*2*gridDim.x;
  if(gridDim.x!=1){
    while(i<np*nd){
       sdata[tid] += pe[i];
@@ -119,6 +117,10 @@ __global__  void add_pe(double *pe,int np,int nd){
    __syncthreads();
  }
  if(tid==0)pe[blockIdx.x]=sdata[0];
+ i = blockIdx.x*blockDim.x+tid;
+ if(i==0){
+  OUT[j] = pe[0];
+ }
 }
 // compute ke;
 /********************************************************************************/
@@ -129,7 +131,6 @@ __global__  void add_ke(double *ke,double* vel,int np,int nd, double mass){
 //  printf("%8d\n",i);
   sdata[tid] = 0;
  if(i>=np*nd)return;
- // int grid = blockSize*2*gridDim.x;
  if(gridDim.x!=1){
    while(i<np*nd){
       sdata[tid] += vel[i]*vel[i];
@@ -148,7 +149,7 @@ __global__  void add_ke(double *ke,double* vel,int np,int nd, double mass){
  if(tid==0)ke[blockIdx.x]=sdata[0];
  if(blockIdx.x*blockDim.x+tid==0&&gridDim.x==1)ke[0]*=0.5*mass;
 }
- 
+
 /******************************************************************************/
 void outputval(double *val,int np,int nd){
   for(int i=0;i<np;i++){
@@ -169,7 +170,7 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 10;
+  int np = 1000;
   double *pos;
   double potential;
   int seed = 123456789;
@@ -220,16 +221,17 @@ int main ( int argc, char *argv[] )
   printf ( "\n" );
   printf ( "  Computing initial forces and energies.\n" );
   // memalloc
-  double* d_acc, *d_force,*d_pos,*d_vel,*ke,*d,*d2,*pe,*rij;
+  double* d_acc, *d_force,*d_pos,*d_vel,*ke,*d,*d2,*pe,*rij,*sumpe;
   cudaMalloc(&d_acc, nd * np * sizeof ( double ));
   cudaMalloc(&d_force, nd * np * sizeof ( double ));
   cudaMalloc(&d_pos, nd * np * sizeof ( double ));
   cudaMalloc(&d_vel, nd * np * sizeof ( double ));
-  cudaMalloc(&ke, blockSize *sizeof ( double ));
+  cudaMalloc(&ke, np *sizeof ( double ));
   cudaMalloc(&rij, nd * np *sizeof ( double ));
   cudaMalloc(&pe, np *sizeof ( double ));
   cudaMalloc(&d, nd * np *sizeof ( double ));
   cudaMalloc(&d2, np *sizeof ( double ));
+  cudaMalloc(&sumpe, np *sizeof ( double ));
   // compute sth
   cudaMemset(d_force,0.0,nd * np * sizeof ( double ));
   cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
@@ -237,20 +239,24 @@ int main ( int argc, char *argv[] )
   cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
   // outputval(force,np,nd);
   potential = 0.0;
-  double total_pe = 0.0;
+  // double total_pe = 0.0;
   for(int j=0;j<np;j++){
 
     compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
     compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
     compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij,j);
 
-    add_pe<< <gridSize, blockSize >> >(pe,1,np);
+    add_pe<< <gridSize, blockSize >> >(pe,1,np,sumpe,j);
     
-    double tmp_pe;
-    cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
-    total_pe += tmp_pe;
+    // double tmp_pe;
+    // cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
+    // total_pe += tmp_pe;
   }
-  potential = total_pe;
+  add_pe<< <gridSize, blockSize >> >(sumpe,1,np,sumpe,0);
+  double tmp_pe;
+  cudaMemcpy(&tmp_pe, sumpe, sizeof ( double ), cudaMemcpyDeviceToHost);
+  printf("%8f\n",tmp_pe);
+  potential = tmp_pe;
 
   add_ke<< <gridSize, blockSize >> >(ke,d_vel,np,nd,mass);
   if(gridSize>1)
@@ -281,7 +287,7 @@ int main ( int argc, char *argv[] )
   step_print_num = 10;
   
   step = 0;
-  printf ( "  %8d  %14.10f  %14.10f  %14.10e\n",
+  printf ( "  %8d  %14f  %14f  %14e\n",
     step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
@@ -297,7 +303,6 @@ int main ( int argc, char *argv[] )
     // cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     
     potential = 0.0;
-    double total_pe = 0.0;
     for(int j=0;j<np;j++){
 
 
@@ -305,17 +310,20 @@ int main ( int argc, char *argv[] )
       compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
       compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij,j);
 
-      add_pe<< <gridSize, blockSize >> >(pe,1,np);
-     
-      double tmp_pe;
-      cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
-      total_pe += tmp_pe;
+      add_pe<< <gridSize, blockSize >> >(pe,1,np,sumpe,j);
+      // tmp_pe<< <    1   ,      1    >> >(sumpe,pe,j);
+      // double tmp_pe;
+      // cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
+      // total_pe += tmp_pe;
 
     }
+    add_pe<< <gridSize, blockSize >> >(sumpe,1,np,sumpe,0);
+    double tmp_pe;
+    cudaMemcpy(&tmp_pe, sumpe, sizeof ( double ), cudaMemcpyDeviceToHost);
     // double *f = ( double * ) malloc ( nd * np * sizeof ( double ) );
     //   cudaMemcpy(f, d_force, np*nd*sizeof ( double ), cudaMemcpyDeviceToHost);
     // outputval(f,np,nd);
-    potential = total_pe;
+    potential = tmp_pe;
     
   
     
@@ -331,7 +339,7 @@ int main ( int argc, char *argv[] )
     kinetic = tmp;
     if ( step == step_print )
     {
-      printf ( "  %8d  %14.10f  %14.10f  %14.10e\n",
+      printf ( "  %8d  %14f  %14f  %14e\n",
     step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
@@ -341,11 +349,11 @@ int main ( int argc, char *argv[] )
     update<< <gridSize, blockSize >> > ( np, nd, d_pos, d_vel, d_force, d_acc, mass, dt );
  
   }
-  //wtime = GetTimer() ;
+  double runtime = GetTimer();
 
   printf ( "\n" );
   printf ( "  Elapsed time for main computation:\n" );
-  //printf ( "  %f seconds.\n", wtime );
+  printf ( "  %f seconds.\n", runtime/1000 );
 /*
   Free memory.
 */
@@ -379,79 +387,6 @@ int main ( int argc, char *argv[] )
   return 0;
 }
 /******************************************************************************/
-
-void compute ( int np, int nd, double pos[], double vel[], 
-  double mass, double f[], double *pot, double *kin,int j )
-{
-  double d;
-  double d2;
-  int i;
-  int k;
-  double pe;
-  double PI2 = 3.141592653589793 / 2.0;
-  double rij[3];
-
-  pe = 0.0;
-
-
- 
-
-  for ( k = 0; k < np; k++ )
-  {
-    if ( k != j )
-    {
-      d = 0.0;
-      for ( i = 0; i < nd; i++ ){
-        rij[i] = pos[i+k*nd] - pos[i+j*nd];
-        d = d + rij[i] * rij[i];
-      }
-      d = sqrt ( d );
-      // if(k==0)
-      // printf("%8f %8f %8f \n", rij[0],rij[1],rij[2]);
-/*  
-Attribute half of the potential energy to particle J.
-*/
-      if ( d < PI2 )
-      {
-        d2 = d;
-      }
-      else
-      {
-        d2 = PI2;
-      }
-
-      pe = pe + 0.5 * pow ( sin ( d2 ), 2 );
-
-      for ( i = 0; i < nd; i++ )
-      {
-        f[i+k*nd] = f[i+k*nd] - rij[i] * sin ( 2.0 * d2 ) / d;
-      }
-    }
-  }
-
-
-  
-  *pot += pe;
-
-  return;
-}
-/******************************************************************************/
-
-double dist ( int nd, double r1[], double r2[], double dr[] )
-{
-  double d;
-  int i;
-
-  d = 0.0;
-  for ( i = 0; i < nd; i++ )
-  {
-    dr[i] = r1[i] - r2[i];
-    d = d + dr[i] * dr[i];
-  }
-  d = sqrt ( d );
-
-  return d;
-}
 /******************************************************************************/
 
 void initialize ( int np, int nd, double box[], int *seed, double pos[], 
