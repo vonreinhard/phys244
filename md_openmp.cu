@@ -174,7 +174,7 @@ int main ( int argc, char *argv[] )
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 2;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -276,34 +276,23 @@ int main ( int argc, char *argv[] )
   StartTimer();;
   // parameter initialization
   
-
+  cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
   cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
   for ( step = 1; step <= step_num; step++ )
   {
-    cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     
-
     cudaMemset(d_force,0.0000000,nd * np * sizeof ( double ));
-    cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     
     potential = 0.0;
     double total_pe = 0.0;
     for(int j=0;j<np;j++){
-      printf("\n");
-      compute ( np, nd, pos, vel, mass, force, &potential, &kinetic,j );
 
 
       compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
       compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
       compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij,j);
-
-      // double *f = ( double * ) malloc ( nd * np * sizeof ( double ) );
-      // cudaMemcpy(f, d_force, np*nd*sizeof ( double ), cudaMemcpyDeviceToHost);
-      
-      // if(j!=0)
-      
-      // printf("%8f %8f %8f\n",f[0],f[1],f[2]);
 
       add_pe<< <gridSize, blockSize >> >(pe,1,np);
      
@@ -328,9 +317,6 @@ int main ( int argc, char *argv[] )
       add_ke<< <1, blockSize >> >(ke,ke,1,blockSize,mass);
     double tmp;
     cudaMemcpy(&tmp, ke, sizeof ( double ), cudaMemcpyDeviceToHost);
-    // if(tmp!=kinetic){
-    //   printf("%.14f %.14f \n",tmp,kinetic);
-    // }
     kinetic = tmp;
     if ( step == step_print )
     {
@@ -340,16 +326,8 @@ int main ( int argc, char *argv[] )
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
    
-    cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_force, force, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    // cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
 
     update<< <gridSize, blockSize >> > ( np, nd, d_pos, d_vel, d_force, d_acc, mass, dt );
-
-    cudaMemcpy(pos, d_pos, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
-    cudaMemcpy(vel, d_vel, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
-    cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
  
   }
   //wtime = GetTimer() ;
