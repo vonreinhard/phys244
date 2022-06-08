@@ -156,7 +156,14 @@ __global__  void add_ke(double *ke,double* vel,int np,int nd, double mass){
 }
  
 /******************************************************************************/
-
+void outputval(double *val,int np,int nd){
+  for(int i=0;i<np;i++){
+    for(int j=0;j<nd;j++){
+      printf("%4f ",val[i*nd+j]);
+    }
+    printf("\n");
+  }
+}
 int main ( int argc, char *argv[] )
 {
   double *acc;
@@ -218,7 +225,21 @@ int main ( int argc, char *argv[] )
 */
   printf ( "\n" );
   printf ( "  Computing initial forces and energies.\n" );
-
+  // memalloc
+  double* d_acc, *d_force,*d_pos,*d_vel,*ke,*d,*d2,*pe,*rij;
+  cudaMalloc(&d_acc, nd * np * sizeof ( double ));
+  cudaMalloc(&d_force, nd * np * sizeof ( double ));
+  cudaMalloc(&d_pos, nd * np * sizeof ( double ));
+  cudaMalloc(&d_vel, nd * np * sizeof ( double ));
+  cudaMalloc(&ke, blockSize *sizeof ( double ));
+  cudaMalloc(&rij, nd * np *sizeof ( double ));
+  cudaMalloc(&pe, nd * np *sizeof ( double ));
+  cudaMalloc(&d, nd * np *sizeof ( double ));
+  cudaMalloc(&d2, np *sizeof ( double ));
+  // compute sth
+  cudaMemset(d_force,0.0,nd * np * sizeof ( double ));
+  cudaMemcpy(force,d_force,nd * np * sizeof ( double ),cudaMemcpyDeviceToHost);
+  // outputval(force,np,nd);
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
@@ -250,26 +271,23 @@ int main ( int argc, char *argv[] )
 
   StartTimer();;
   // parameter initialization
-  double* d_acc, *d_force,*d_pos,*d_vel,*ke,*d,*d2,*pe,*rij;
-  cudaMalloc(&d_acc, nd * np * sizeof ( double ));
-  cudaMalloc(&d_force, nd * np * sizeof ( double ));
-  cudaMalloc(&d_pos, nd * np * sizeof ( double ));
-  cudaMalloc(&d_vel, nd * np * sizeof ( double ));
-  cudaMalloc(&ke, blockSize *sizeof ( double ));
-  cudaMalloc(&rij, nd * np *sizeof ( double ));
-  cudaMalloc(&pe, nd * np *sizeof ( double ));
-  cudaMalloc(&d, nd * np *sizeof ( double ));
-  cudaMalloc(&d2, np *sizeof ( double ));
-  // cudaMalloc(&d_kinetic, sizeof ( double ));
+  
+
 
   for ( step = 1; step <= step_num; step++ )
   {
     cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_force, force, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+    // cudaMemcpy(d_force, force, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
 
-    cudaMemset(&d_force,0.0,nd * np * sizeof ( double ));
+    cudaMemset(d_force,0.0000000,nd * np * sizeof ( double ));
+    cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
+    // outputval(force,np,nd);
+    // for(int i=0;i<np;i++)
+    //   for(int j=0;j<nd;j++)
+    //     if(fabs(force[j+i*nd] -0.0)>0.00001)printf("%8f\n",  fabs(force[j+i*nd] ));
+    compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
     // double total_pe = 0.0;
     // for(int j=0;j<np;j++){
     //   compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
@@ -283,7 +301,7 @@ int main ( int argc, char *argv[] )
     //     total_pe += tmp_pe;
     // }
     // printf("%8f\n",total_pe);
-    compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
+    
     
 
     // compute ke
@@ -366,13 +384,11 @@ void compute ( int np, int nd, double pos[], double vel[],
   int i;
   int j;
   int k;
-  double ke;
   double pe;
   double PI2 = 3.141592653589793 / 2.0;
   double rij[3];
 
   pe = 0.0;
-  ke = 0.0;
 
 
   for ( k = 0; k < np; k++ )
@@ -382,7 +398,7 @@ void compute ( int np, int nd, double pos[], double vel[],
 */
     for ( i = 0; i < nd; i++ )
     {
-      f[i+k*nd] = 0.0;
+      // if(fabs(f[i+k*nd] -0.0)>0.00001)printf("%8f\n",  fabs(f[i+k*nd] ));
     }
 
     for ( j = 0; j < np; j++ )
