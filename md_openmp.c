@@ -62,12 +62,12 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 100;
+  int np = 20;
   double *pos;
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 100;
+  int step_num = 10;
   int step_print;
   int step_print_index;
   int step_print_num;

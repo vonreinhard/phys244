@@ -168,7 +168,7 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 100;
+  int np = 50;
   double *pos;
   double potential;
   int seed = 123456789;
@@ -270,18 +270,18 @@ int main ( int argc, char *argv[] )
 
     cudaMemset(&d_force,0.0,nd * np * sizeof ( double ));
     double total_pe = 0.0;
-    for(int j=0;j<np;j++){
-      compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
-      compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
-      compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij);
-      add_pe<< <gridSize, blockSize >> >(pe,np,nd);
-      if(gridSize>1)
-        add_pe<< <1, blockSize >> >(pe,1,blockSize);
-        double tmp_pe;
-        cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
-        total_pe += tmp_pe;
-    }
-    printf("%8f\n",total_pe);
+    // for(int j=0;j<np;j++){
+    //   compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
+    //   compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
+    //   compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij);
+    //   add_pe<< <gridSize, blockSize >> >(pe,np,nd);
+    //   if(gridSize>1)
+    //     add_pe<< <1, blockSize >> >(pe,1,blockSize);
+    //     double tmp_pe;
+    //     cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
+    //     total_pe += tmp_pe;
+    // }
+    // printf("%8f\n",total_pe);
     compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
     
 
@@ -365,13 +365,12 @@ void compute ( int np, int nd, double pos[], double vel[],
   int i;
   int j;
   int k;
-  double ke;
   double pe;
   double PI2 = 3.141592653589793 / 2.0;
   double rij[3];
 
   pe = 0.0;
-  ke = 0.0;
+
 
 
   for ( k = 0; k < np; k++ )
@@ -410,19 +409,12 @@ void compute ( int np, int nd, double pos[], double vel[],
         }
       }
     }
-/*
-  Compute the kinetic energy.
-*/
-    for ( i = 0; i < nd; i++ )
-    {
-      ke = ke + vel[i+k*nd] * vel[i+k*nd];
-    }
+
   }
 
-  ke = ke * 0.5 * mass;
+ 
   
   *pot = pe;
-  *kin = ke;
 
   return;
 }
