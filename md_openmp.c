@@ -67,7 +67,7 @@ int main ( int argc, char *argv[] )
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 100;
+  int step_num = 10;
   int step_print;
   int step_print_index;
   int step_print_num;
