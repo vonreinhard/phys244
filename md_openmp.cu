@@ -272,12 +272,12 @@ int main ( int argc, char *argv[] )
   // parameter initialization
   
 
-
+  cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
   for ( step = 1; step <= step_num; step++ )
   {
     cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+    
 
     cudaMemset(d_force,0.0000000,nd * np * sizeof ( double ));
     cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
@@ -295,13 +295,11 @@ int main ( int argc, char *argv[] )
       compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
       compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij);
       add_pe<< <gridSize, blockSize >> >(pe,1,np);
-      // if(gridSize>1)
-      //   add_pe<< <1, blockSize >> >(pe,1,blockSize);
+     
       double tmp_pe;
       cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
       total_pe += tmp_pe;
 
-      // printf("%8f %8f\n",total_pe,potential);
     }
     potential = total_pe;
     
@@ -333,14 +331,14 @@ int main ( int argc, char *argv[] )
     cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
     cudaMemcpy(d_force, force, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+    // cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
 
     update<< <gridSize, blockSize >> > ( np, nd, d_pos, d_vel, d_force, d_acc, mass, dt );
 
     cudaMemcpy(pos, d_pos, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     cudaMemcpy(vel, d_vel, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
-    cudaMemcpy(acc, d_acc, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(acc, d_acc, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     // printf ( "%14f\n",pos[0] );
   }
   //wtime = GetTimer() ;
