@@ -62,12 +62,12 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 2000;
+  int np = 10;
   double *pos;
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 100;
+  int step_num = 20;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -118,7 +118,6 @@ int main ( int argc, char *argv[] )
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
-  printf("%8f\n",e0);
 /*
   This is the main time stepping loop:
     Compute forces and energies,
@@ -139,7 +138,7 @@ int main ( int argc, char *argv[] )
   step_print_num = 10;
   
   step = 0;
-  printf ( "  %8d  %14.10f  %14.10f  %14.10e\n",
+  printf ( "  %8d  %14f  %14f  %14e\n",
     step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
@@ -149,17 +148,17 @@ int main ( int argc, char *argv[] )
   for ( step = 1; step <= step_num; step++ )
   {
     compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
-    
+
     if ( step == step_print )
     {
-      printf ( "  %8d  %14.10f  %14.10f  %14.10e\n",
-    step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
+      printf ( "  %8d  %14f  %14f  %14e\n", step, potential, kinetic,
+       ( potential + kinetic - e0 ) / e0 );
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
-    // printf ( "%14f\n",pos[0] );
+    printf ( "%14f\n",pos[0] );
     update ( np, nd, pos, vel, force, acc, mass, dt );
-    // printf ( "%14f\n",pos[0] );
+    printf ( "%14f\n",pos[0] );
     // printf ( "%8d\n",pos );
   }
   wtime = omp_get_wtime ( ) - wtime;
@@ -190,6 +189,58 @@ int main ( int argc, char *argv[] )
 
 void compute ( int np, int nd, double pos[], double vel[], 
   double mass, double f[], double *pot, double *kin )
+
+/******************************************************************************/
+/*
+  Purpose:
+
+    COMPUTE computes the forces and energies.
+
+  Discussion:
+
+    The computation of forces and energies is fully parallel.
+
+    The potential function V(X) is a harmonic well which smoothly
+    saturates to a maximum value at PI/2:
+
+      v(x) = ( sin ( min ( x, PI2 ) ) )**2
+
+    The derivative of the potential is:
+
+      dv(x) = 2.0 * sin ( min ( x, PI2 ) ) * cos ( min ( x, PI2 ) )
+            = sin ( 2.0 * min ( x, PI2 ) )
+
+  Licensing:
+
+    This code is distributed under the GNU LGPL license. 
+
+  Modified:
+
+    21 November 2007
+
+  Author:
+
+    Original FORTRAN77 version by Bill Magro.
+    C version by John Burkardt.
+
+  Parameters:
+
+    Input, int NP, the number of particles.
+
+    Input, int ND, the number of spatial dimensions.
+
+    Input, double POS[ND*NP], the position of each particle.
+
+    Input, double VEL[ND*NP], the velocity of each particle.
+
+    Input, double MASS, the mass of each particle.
+
+    Output, double F[ND*NP], the forces.
+
+    Output, double *POT, the total potential energy.
+
+    Output, double *KIN, the total kinetic energy.
+*/
 {
   double d;
   double d2;
@@ -225,8 +276,7 @@ void compute ( int np, int nd, double pos[], double vel[],
       if ( k != j )
       {
         d = dist ( nd, pos+k*nd, pos+j*nd, rij );
-        
-/*  
+/*
   Attribute half of the potential energy to particle J.
 */
         if ( d < PI2 )
