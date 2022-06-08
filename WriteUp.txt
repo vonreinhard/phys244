@@ -1,0 +1,137 @@
+1) Draw a flowchart of the program, (comments are in jacobi-acc.c and jacobi-omp-fixed.c)
+
+Jacobi Iteration Flowchart:
+    A. Iterate until converged 
+    B. Iterate across matrix: for each Iteration ->
+       Calculate new value from neighbors && Compute max error for convergence
+    C. Swap input/output arraya
+
+2) Record the runtime:
+
+    A. Using the OpenMP version running on an Expanse CPU node using 1,2,4,8,16, 32, 64, and 128 OpenMP threads.
+    
+    -> compile and run " jacobi-omp-fixed.c "
+
+        <a> 4096 x 4096 mesh
+
+            N = 128                 N = 64                  N = 32                  N = 16
+            900, 0.000233           900, 0.000269           900, 0.000269           900, 0.000269
+            total: 295.126696 s     total: 159.468664 s     total: 56.309441 s      total: 21.934996 s
+
+            N = 8                   N = 4                   N = 2                   N = 1
+            900, 0.000269           900, 0.000269           900, 0.000269           900, 0.000269
+            total: 28.816212 s      total: 23.434500 s      total: 21.849777 s      total: 95.106915 s
+
+        <b> 2048 x 2048 mesh
+
+            N = 128                 N = 64                  N = 32                  N = 16
+            900, 0.000147           900, 0.000269           900, 0.000269           900, 0.000269
+            total: 420.489056 s     total: 96.982357 s      total: 28.509331 s      total: 2.367538 s
+
+            N = 8                   N = 4                   N = 2                   N = 1
+            900, 0.000269           900, 0.000269           900, 0.000269           900, 0.000269
+            total: 0.733533 s       total: 7.686637 s       total: 8.201745 s       total: 10.330598 s
+
+        <c> 8192 x 8192 mesh
+
+            N = 128                 N = 64                  N = 32                  N = 16
+            900, 0.000269           900, 0.000269           900, 0.000269           900, 0.000269
+            total: 365.889701 s     total: 135.226175 s     total: 148.847564 s     total: 48.866471 s
+
+            N = 8                   N = 4                   N = 2                   N = 1
+            900, 0.000269           900, 0.000269           900, 0.000269           900, 0.000269
+            total: 79.857051 s      total: 93.601951 s      total: 130.111079 s     total: 209.642440 s
+    
+    B. Using the OpenACC version running on a single GPU of an Expanse GPU node. 
+
+    -> compile and run " jacobi-acc.c "
+
+        <a> 4096 x 4096 mesh
+            900, 0.000269
+            total: 1.078295 s
+
+        <b> 2048 x 2048 mesh
+            900, 0.000269
+            total: 0.445150 s
+
+        <c> 8192 x 8192 mesh
+            900, 0.000269
+            total: 4.664880 s
+
+    C. Repeat Sec A and Sec B with NN and NM variables equal to 2048 and 8192.
+
+        I include runtime of NN and NM equal to 2048 and 8192 in sec A and sec B together with NN and NM equal to 4096.
+
+    D. Observation and Discussion. (The graphs and plots are in Graph.ipynb notebook.)
+
+        - Based on the plot "OpenMP Thread-Runtime", we can find that for all mesh size 2048, 4096 and 8192, 
+        the runtime tends to reach the lowest value around THREAD equal to 16. After that point (THREAD = 16), the runtime 
+        for all of the mesh size significantly increase.
+          
+        I think the reason is that high thread number will result taking too much time on seperating and assigning tasks to each thread.
+        
+        - For the THREAD number lower than 64, higher mesh size tends to have a better (lower) runtime compare to others.
+        - For the THREAD number higher than 64, lower mesh size tends to have a better (lower) runtime compare to others.
+        
+        I think the large mesh size data takes more advantage on high thread number.
+
+        - Based on the plot "OpenACC Mesh_SIZE-Runtime", we can find that the runtime tends to increase as the mesh size increases.
+        - OpenACC with GPU thends to have an overall better performance than Threaded OpenMP on CPU.
+
+    E. Commands to run code.
+
+        EVN: 
+        module purge
+        module load slurm
+        module load gpu/0.15.4
+        module load pgi/20.4
+
+        OMP:
+        pgcc -fast -mp -Minfo=mp -o jacobi-pgcc-omp.x jacobi-omp-fixed.c
+        srun --partition=debug --pty --account=csd453 --nodes=1 --ntasks-per-node=8 --mem=16G -t 00:30:00 --wait=0 --export=ALL /bin/bash
+        sbatch --account=csd453 jacobi-omp-fixed.sb
+
+        OACC:
+        pgcc -o jacobi-pgcc-acc.x -fast -Minfo -acc -ta=tesla:cc70 jacobi-acc.c
+        srun --partition=gpu-debug --pty --account=csd453 --nodes=1 --ntasks-per-node=10 --mem=96G --gpus=1 -t 00:30:00 --wait=0 --export=ALL /bin/bash
+        sbatch --account=csd453 jacobi-acc.sb
+
+2) CUDA Implementaion: (comments are in source code jacobi-cuda-test.cu)
+
+    I basicaly follow the steps of the Jacobi algorithm to convert OpenACC code to the CUDA code.
+    The challange I faced is to implement the cuda kernal function with different grid and block size and 
+    keep track of the row and column index. Another challange is to add the error calculation along with the 
+    matrix comuptation in the kernal function. I ended up calculating the error in host every time when getting the updated 
+    data back from device.
+
+3) CUDA runtime:
+
+    A. Output.
+      Jacobi relaxation Calculation: 8192 x 8192 mesh
+        0, 0.250000
+        10, 0.005198
+        20, 0.000580
+        30, 0.000081
+        40, 0.000012
+        50, 0.000002
+      last iteration: 56
+      total: 30.860856 s
+
+      The result shows that the runtime of my implemenation of cuda is better than OpenMP but worse than OpenACC
+      with a mesh size of 8192. I think the main part of the code works fine, because it converged in relatively 
+      a small iteration (56 iter). I think the part my code spend too much time on calculating the error in each iteration
+      since I coundn't find a correct way to implement that part with cuda parallelization.
+
+    B. Commands to run code.
+
+    EVN: 
+    module purge
+    module load slurm
+    module load gpu/0.15.4
+    module load pgi/20.4
+    module load cuda
+
+    CUDA:
+    nvcc jacobi-cuda-test.cu -o jacobi-cuda-test.x
+    srun --partition=gpu-debug --pty --account=csd453 --nodes=1 --ntasks-per-node=10 --mem=96G --gpus=1 -t 00:30:00 --wait=0 --export=ALL /bin/bash
+    sbatch --account=csd453 jacobi-cuda-test.sb
