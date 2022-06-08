@@ -232,12 +232,25 @@ int main ( int argc, char *argv[] )
   cudaMalloc(&d2, np *sizeof ( double ));
   // compute sth
   cudaMemset(d_force,0.0,nd * np * sizeof ( double ));
-  cudaMemcpy(force,d_force,nd * np * sizeof ( double ),cudaMemcpyDeviceToHost);
+  cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
   // outputval(force,np,nd);
   potential = 0.0;
+  double total_pe = 0.0;
   for(int j=0;j<np;j++){
-    compute ( np, nd, pos, vel, mass, force, &potential, &kinetic,j );
+
+    compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
+    compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
+    compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij,j);
+
+    add_pe<< <gridSize, blockSize >> >(pe,1,np);
+    
+    double tmp_pe;
+    cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
+    total_pe += tmp_pe;
   }
+  potential = total_pe;
 
   add_ke<< <gridSize, blockSize >> >(ke,d_vel,np,nd,mass);
   if(gridSize>1)
@@ -247,7 +260,7 @@ int main ( int argc, char *argv[] )
   kinetic = tmp;
   
   e0 = potential + kinetic;
-  printf("%8f\n",e0);
+  
 /*
   This is the main time stepping loop:
     Compute forces and energies,
@@ -276,9 +289,7 @@ int main ( int argc, char *argv[] )
   StartTimer();;
   // parameter initialization
   
-  cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
+  
   for ( step = 1; step <= step_num; step++ )
   {
     
