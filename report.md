@@ -32,7 +32,9 @@ The later one is much easy since there is not data dependecy in this function an
 
 But the first part is not such stright forward. There are three level for loops and many sub for loops in this function. It is hard for us to spilt to each thread. But we know that in many situation, the best approach to achieve serial method may not be also a good method when doing the parallelization. I observer that we could reorganized function and then it will be easy parallelization for CUDA method. I would use md_openmp.c document as the reference to describe how I reorganize the function in the following
 
-At first, we could observer that the initialization from line 269-272 will occur once for each element in force array. The program from 302-305 has similar situation. For initialization, we could use $\mathbf{cudamemset}$ before this program starts. For the later part, the
+At first, we could observer that the initialization from line 269-272 will occur once for each element in force array. The program from 302-305 has similar situation. For initialization, we could use $\mathbf{cudamemset}$ before this program starts. For the later part, the array $\mathbf{vel}$ and the value $\mathbf{ke}$ has no depency with above function. Thus, we could divide then into two different part one is doing above and the other does the ke computation. The parallelization for above part is still hard, but is much easier now.
+
+In the remaining unparallelized program, we found that we could swith k and j now. After switching, we could do the parallelization under the for loop of j and we just need to do an extra reduction add to sum the result in this loop and then it could be paralleliazation.
 
 ## Section 4 Performance Model
 
@@ -44,4 +46,12 @@ At first, we could observer that the initialization from line 269-272 will occur
 
 ## Section 5 Conclusion
 
+
+
+
+## Section 6 Future work 
+For CUDA, we may use some method to parallelized the j loop. But this need more syncronization problem.
+
 ## Reference
+[1] John burkardt. (n.d.). Md_openmp.
+https://people.sc.fsu.edu/~jburkardt/cpp_src/md_openmp
