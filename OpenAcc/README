@@ -1,0 +1,16 @@
+EVN: 
+module purge
+module load slurm
+module load gpu/0.15.4
+module load pgi/20.4
+
+OMP:
+pgcc -fast -mp -Minfo=mp -o md-pgcc-omp.x md_openmp.c
+srun --partition=debug --pty --account=csd453 --nodes=1 --ntasks-per-node=8 --mem=16G -t 00:30:00 --wait=0 --export=ALL /bin/bash
+sbatch --account=csd453 md-omp.sb
+
+OACC:
+pgcc -o md-pgcc-acc.x -fast -Minfo -acc -ta=tesla:cc70 md_openacc.c
+srun --partition=gpu-debug --pty --account=csd453 --nodes=1 --ntasks-per-node=10 --mem=96G --gpus=1 -t 00:30:00 --wait=0 --export=ALL /bin/bash
+srun --partition=gpu --pty --account=csd453 --nodes=1 --ntasks-per-node=10 --mem=96G --gpus=1 -t 00:30:00 --wait=0 --export=ALL /bin/bash
+sbatch --account=csd453 md-acc.sb

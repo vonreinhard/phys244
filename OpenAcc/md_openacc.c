@@ -208,17 +208,14 @@ void compute ( int np, int nd, float pos[], float vel[],
         {
           // float rij[3]; 
           // d = dist ( nd, pos+k*nd, pos+j*nd, rij );
+
           float d = 0.0;
-          // #pragma acc loop independent vector(16)
+          #pragma acc loop
             for ( int i = 0; i < nd; i++ )
             {
               rij[i] = (pos+k*nd)[i] - (pos+j*nd)[i];
+              d = d + rij[i] * rij[i];
             }
-
-          for ( int i = 0; i < nd; i++ )
-          {
-            d = d + rij[i] * rij[i];
-          }
           d = sqrt ( d );
   /*
     Attribute half of the potential energy to particle J.
@@ -236,7 +233,7 @@ void compute ( int np, int nd, float pos[], float vel[],
 
           pe = pe + 0.5 * pow ( sin ( d2 ), 2 );
 
-          // #pragma acc loop independent vector(16)
+          #pragma acc loop 
             for ( int i = 0; i < nd; i++ )
             {
               f[i+k*nd] = f[i+k*nd] - rij[i] * sin ( 2.0 * d2 ) / d;
@@ -376,11 +373,13 @@ void update ( int np, int nd, float pos[], float vel[], float f[],
 #pragma acc data copyin(f[:nd+(np*nd)], acc[:nd+(np*nd)], pos[:nd+(np*nd)], vel[:nd+(np*nd)], dt, nd, np, rmass)
 
 // #pragma acc kernels
-#pragma acc region
-#pragma acc loop independent vector(16)
+// #pragma acc region
+// #pragma acc loop independent vector(16)
+
+#pragma acc parallel loop
   for (int j = 0; j < np; j++ )
   {
-    // #pragma acc loop independent vector(16)
+    #pragma acc loop
     for (int i = 0; i < nd; i++ )
     {
       pos[i+j*nd] = pos[i+j*nd] + vel[i+j*nd] * dt + 0.5 * acc[i+j*nd] * dt * dt;

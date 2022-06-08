@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH --job-name="md-openACC"
+#SBATCH --output="md-openACC.%j.%N.out"
+#SBATCH --partition=gpu-shared
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus=1
+#SBATCH --account=csd453
+#SBATCH --res=phys244res
+#SBATCH -t 01:00:00
+
+#Environment
+module purge
+module load slurm
+module load gpu/0.15.4
+module load pgi/20.4
+
+#Run the job
+./md-pgcc-acc.x
