@@ -39,10 +39,13 @@ Using the PGI compiler
     pgcc -acc -Minfo=accel -o jacobi-pgcc-acc.x jacobi-acc.c
     pgf90 -acc -Minfo=accel -o jacobi-pgf90-acc.x jacobi-acc.f90
 
+# CUDA part
+To run CUDA version interactively, you need to do following commands: 
 
-module purge
-module load slurm
-module load gpu
-module load cuda
-nvcc md_openmp.cu -o md.o
+    # CUDA serial command
+    module purge
+    module load slurm
+    module load gpu
+    module load cuda
+    nvcc md_openmp.cu -o md.o
 
