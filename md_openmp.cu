@@ -391,17 +391,13 @@ void compute ( int np, int nd, double pos[], double vel[],
   pe = 0.0;
 
 
-  for ( k = 0; k < np; k++ )
+  for ( j = 0; j < np; j++ )
   {
 /*
   Compute the potential energy and forces.
 */
-    for ( i = 0; i < nd; i++ )
-    {
-      // if(fabs(f[i+k*nd] -0.0)>0.00001)printf("%8f\n",  fabs(f[i+k*nd] ));
-    }
 
-    for ( j = 0; j < np; j++ )
+    for ( k = 0; k < np; k++ )
     {
       if ( k != j )
       {
