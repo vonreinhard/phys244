@@ -22,12 +22,13 @@ Original:
 `md_openmp.c`   - The serial C code use OpenMP 
 
 Our Work:  
-`md_openmp.cu`   - CUDA parallel C code  
+`md_openmp.cu`   - CUDA parallel C code   
+`md_openacc.c`   - OpenAcc parallel C code  
 
 Script:  
-`CUDA.sb` - A simple script to running cuda version of our work.
-
-`md-omp.sb` - A simple script to running openmp version of our work.
+`CUDA.sb` - A simple script to running cuda version of our work.  
+`md-acc.sb` - A simple script to running openacc version of our work.  
+`md-omp.sb` - A simple script to running openmp version of our work.  
 # OpenMP
 Compile:  
 Using the PGI compiler
@@ -41,6 +42,27 @@ Using the PGI compiler
     pgcc -fast -mp -Minfo=mp -o md_openmp.x md_openmp.c
     ./md_openmp.x
 
+Batch Script submission
+
+    # Batch script
+    sbatch md-omp.sb
+
+# OpenACC
+Compile:  
+Using the PGI compiler
+
+    # OpenACC serail command
+    module purge
+    module load slurm
+    module load gpu
+    module load pgi
+    pgcc -acc -Minfo=accel -o md_openacc.x md_openacc.c
+    ./md_openacc.x
+
+Batch Script submission
+
+    # Batch script
+    sbatch md-omp.sb
 # CUDA part
 To run CUDA version interactively, you need to do following commands: 
 
