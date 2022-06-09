@@ -167,7 +167,7 @@ void compute ( int np, int nd, double pos[], double vel[],
   pe = 0.0;
   ke = 0.0;
 
-#pragma acc data copy(pe,ke,f[:np*nd]), copyin(pos[:np*nd],vel[:np*nd],nd,np,PI2)
+#pragma acc data copy(pe,ke,f[:np*nd-1]), copyin(pos[:np*nd-1],vel[:np*nd-1],nd,np,PI2)
 #pragma acc parallel loop reduction(+:ke,pe),private(i,j,k,rij,d,d2)
   for ( k = 0; k < np; k++ )
   {
@@ -427,7 +427,7 @@ void update ( int np, int nd, double pos[], double vel[], double f[],
 
   rmass = 1.0 / mass;
 
-#pragma acc data copyin(f[:np*nd],dt,nd,np,rmass),copy(pos[:np*nd],acc[:np*nd],vel[:np*nd])
+#pragma acc data copyin(f[:np*nd-1],dt,nd,np,rmass),copy(pos[:np*nd-1],acc[:np*nd-1],vel[:np*nd-1])
 #pragma acc parallel loop
   for ( j = 0; j < np; j++ )
   {
