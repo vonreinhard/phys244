@@ -62,7 +62,8 @@ Using the PGI compiler
 Batch Script submission
 
     # Batch script
-    sbatch md-omp.sb
+    sbatch md-acc.sb
+    
 # CUDA part
 To run CUDA version interactively, you need to do following commands: 
 
@@ -74,3 +75,7 @@ To run CUDA version interactively, you need to do following commands:
     nvcc CUDA/md_openmp.cu -o md.o
     ./md.o
 
+Batch Script submission
+
+    # Batch script
+    sbatch CUDA.sb
