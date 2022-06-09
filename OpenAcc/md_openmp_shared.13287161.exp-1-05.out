@@ -1,0 +1,44 @@
+08 June 2022 12:59:06 PM
+
+MD_OPENMP
+  C/OpenMP version
+  A molecular dynamics program.
+
+  NP, the number of particles in the simulation is 10
+  STEP_NUM, the number of time steps, is 100
+  DT, the size of each time step, is 0.000100
+
+  Number of processors available = 16
+  Number of threads =              16
+
+  Initializing positions, velocities, and accelerations.
+
+  Computing initial forces and energies.
+
+  At each step, we report the potential and kinetic energies.
+  The sum of these energies should be a constant.
+  As an accuracy check, we also print the relative error
+  in the total energy.
+
+      Step      Potential       Kinetic        (P+K-E0)/E0
+                Energy P        Energy K       Relative Energy Error
+
+         0       44.932708        0.000000    0.000000e+00
+        10       44.932708        0.000000    1.396758e-11
+        20       44.932708        0.000001    1.396062e-11
+        30       44.932706        0.000002    1.393943e-11
+        40       44.932705        0.000004    1.389673e-11
+        50       44.932703        0.000006    1.382478e-11
+        60       44.932700        0.000009    1.371519e-11
+        70       44.932697        0.000012    1.356054e-11
+        80       44.932693        0.000015    1.335354e-11
+        90       44.932689        0.000020    1.308582e-11
+       100       44.932684        0.000024    1.274978e-11
+
+  Elapsed time for main computation:
+  0.000379 seconds.
+
+MD_OPENMP
+  Normal end of execution.
+
+08 June 2022 12:59:06 PM

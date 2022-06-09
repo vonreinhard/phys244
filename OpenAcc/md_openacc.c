@@ -30,12 +30,12 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 10;
+  int np = 1000;
   double *pos;
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 20;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -107,8 +107,8 @@ int main ( int argc, char *argv[] )
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
 
-  GetTimer();
-
+  StartTimer();
+// #pragma acc data copy(pos,vel,acc,force) , kernels
   for ( step = 1; step <= step_num; step++ )
   {
     compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
@@ -153,58 +153,6 @@ int main ( int argc, char *argv[] )
 
 void compute ( int np, int nd, double pos[], double vel[], 
   double mass, double f[], double *pot, double *kin )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    COMPUTE computes the forces and energies.
-
-  Discussion:
-
-    The computation of forces and energies is fully parallel.
-
-    The potential function V(X) is a harmonic well which smoothly
-    saturates to a maximum value at PI/2:
-
-      v(x) = ( sin ( min ( x, PI2 ) ) )**2
-
-    The derivative of the potential is:
-
-      dv(x) = 2.0 * sin ( min ( x, PI2 ) ) * cos ( min ( x, PI2 ) )
-            = sin ( 2.0 * min ( x, PI2 ) )
-
-  Licensing:
-
-    This code is distributed under the GNU LGPL license. 
-
-  Modified:
-
-    21 November 2007
-
-  Author:
-
-    Original FORTRAN77 version by Bill Magro.
-    C version by John Burkardt.
-
-  Parameters:
-
-    Input, int NP, the number of particles.
-
-    Input, int ND, the number of spatial dimensions.
-
-    Input, double POS[ND*NP], the position of each particle.
-
-    Input, double VEL[ND*NP], the velocity of each particle.
-
-    Input, double MASS, the mass of each particle.
-
-    Output, double F[ND*NP], the forces.
-
-    Output, double *POT, the total potential energy.
-
-    Output, double *KIN, the total kinetic energy.
-*/
 {
   double d;
   double d2;
@@ -219,12 +167,12 @@ void compute ( int np, int nd, double pos[], double vel[],
   pe = 0.0;
   ke = 0.0;
 
-# pragma omp parallel \
-  shared ( f, nd, np, pos, vel ) \
-  private ( i, j, k, rij, d, d2 )
+// # pragma omp parallel \
+//   shared ( f, nd, np, pos, vel ) \
+//   private ( i, j, k, rij, d, d2 )
   
-
-# pragma omp for reduction ( + : pe, ke )
+// #pragma acc kernels
+// # pragma omp for reduction ( + : pe, ke )
   for ( k = 0; k < np; k++ )
   {
 /*
@@ -239,7 +187,13 @@ void compute ( int np, int nd, double pos[], double vel[],
     {
       if ( k != j )
       {
-        d = dist ( nd, pos+k*nd, pos+j*nd, rij );
+        d = 0.0;
+        for ( i = 0; i < nd; i++ )
+        {
+          rij[i] = pos[i+k*nd] - pos[i+j*nd];
+          d = d + rij[i] * rij[i];
+        }
+        d = sqrt ( d );
 /*
   Attribute half of the potential energy to particle J.
 */
@@ -514,54 +468,6 @@ void timestamp ( void )
 
 void update ( int np, int nd, double pos[], double vel[], double f[], 
   double acc[], double mass, double dt )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    UPDATE updates positions, velocities and accelerations.
-
-  Discussion:
-
-    The time integration is fully parallel.
-
-    A velocity Verlet algorithm is used for the updating.
-
-    x(t+dt) = x(t) + v(t) * dt + 0.5 * a(t) * dt * dt
-    v(t+dt) = v(t) + 0.5 * ( a(t) + a(t+dt) ) * dt
-    a(t+dt) = f(t) / m
-
-  Licensing:
-
-    This code is distributed under the GNU LGPL license. 
-
-  Modified:
-
-    17 April 2009
-
-  Author:
-
-    Original FORTRAN77 version by Bill Magro.
-    C version by John Burkardt.
-
-  Parameters:
-
-    Input, int NP, the number of particles.
-
-    Input, int ND, the number of spatial dimensions.
-
-    Input/output, double POS[ND*NP], the position of each particle.
-
-    Input/output, double VEL[ND*NP], the velocity of each particle.
-
-    Input, double F[ND*NP], the force on each particle.
-
-    Input/output, double ACC[ND*NP], the acceleration of each particle.
-
-    Input, double MASS, the mass of each particle.
-
-    Input, double DT, the time step.
-*/
 {
   int i;
   int j;
@@ -569,13 +475,16 @@ void update ( int np, int nd, double pos[], double vel[], double f[],
 
   rmass = 1.0 / mass;
 
-# pragma omp parallel \
-  shared ( acc, dt, f, nd, np, pos, rmass, vel ) \
-  private ( i, j )
+// # pragma omp parallel \
+//   shared ( acc, dt, f, nd, np, pos, rmass, vel ) \
+//   private ( i, j )
 
-# pragma omp for
+// # pragma omp for
+#pragma acc data copyin(f[:np*nd],dt,nd,np,rmass),copy(pos[:np*nd],acc[:np*nd],vel[:np*nd])
+#pragma acc kernels
   for ( j = 0; j < np; j++ )
   {
+    // #pragma acc loop
     for ( i = 0; i < nd; i++ )
     {
       pos[i+j*nd] = pos[i+j*nd] + vel[i+j*nd] * dt + 0.5 * acc[i+j*nd] * dt * dt;

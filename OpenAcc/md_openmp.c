@@ -62,12 +62,12 @@ int main ( int argc, char *argv[] )
   double kinetic;
   double mass = 1.0;
   int nd = 3;
-  int np = 10;
+  int np = 1000;
   double *pos;
   double potential;
   int seed = 123456789;
   int step;
-  int step_num = 20;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
@@ -156,10 +156,9 @@ int main ( int argc, char *argv[] )
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
-    printf ( "%14f\n",pos[0] );
+    // printf ( "%14f\n",pos[0] );
     update ( np, nd, pos, vel, force, acc, mass, dt );
-    printf ( "%14f\n",pos[0] );
-    // printf ( "%8d\n",pos );
+  
   }
   wtime = omp_get_wtime ( ) - wtime;
 
@@ -255,12 +254,7 @@ void compute ( int np, int nd, double pos[], double vel[],
   pe = 0.0;
   ke = 0.0;
 
-# pragma omp parallel \
-  shared ( f, nd, np, pos, vel ) \
-  private ( i, j, k, rij, d, d2 )
-  
 
-# pragma omp for reduction ( + : pe, ke )
   for ( k = 0; k < np; k++ )
   {
 /*
@@ -605,11 +599,7 @@ void update ( int np, int nd, double pos[], double vel[], double f[],
 
   rmass = 1.0 / mass;
 
-# pragma omp parallel \
-  shared ( acc, dt, f, nd, np, pos, rmass, vel ) \
-  private ( i, j )
 
-# pragma omp for
   for ( j = 0; j < np; j++ )
   {
     for ( i = 0; i < nd; i++ )
