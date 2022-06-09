@@ -82,6 +82,7 @@ int main ( int argc, char *argv[] )
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
+  printf("%8.10f    %8.10f\n",e0,potential);
 /*
   This is the main time stepping loop:
     Compute forces and energies,
@@ -173,30 +174,33 @@ void compute ( int np, int nd, double pos[], double vel[],
   
 // #pragma acc kernels
 // # pragma omp for reduction ( + : pe, ke )
+#pragma acc data copy(pe,ke,f[:np*nd]), copyin(pos[:np*nd],vel[:np*nd],nd,np,PI2)
+#pragma acc parallel loop reduction(+:ke,pe),private(i,j,k,rij,d,d2)
   for ( k = 0; k < np; k++ )
   {
 /*
   Compute the potential energy and forces.
 */
+    // #pragma acc data present(f)
+    #pragma acc loop independent
     for ( i = 0; i < nd; i++ )
     {
       f[i+k*nd] = 0.0;
     }
-
+    #pragma acc loop reduction(+:pe)
     for ( j = 0; j < np; j++ )
     {
       if ( k != j )
       {
         d = 0.0;
+        #pragma acc loop
         for ( i = 0; i < nd; i++ )
         {
           rij[i] = pos[i+k*nd] - pos[i+j*nd];
           d = d + rij[i] * rij[i];
         }
+        // printf("%8f\n",d);
         d = sqrt ( d );
-/*
-  Attribute half of the potential energy to particle J.
-*/
         if ( d < PI2 )
         {
           d2 = d;
@@ -207,7 +211,7 @@ void compute ( int np, int nd, double pos[], double vel[],
         }
 
         pe = pe + 0.5 * pow ( sin ( d2 ), 2 );
-
+        #pragma acc loop
         for ( i = 0; i < nd; i++ )
         {
           f[i+k*nd] = f[i+k*nd] - rij[i] * sin ( 2.0 * d2 ) / d;
@@ -216,11 +220,15 @@ void compute ( int np, int nd, double pos[], double vel[],
     }
 /*
   Compute the kinetic energy.
-*/
+*/  
+    // #pragma acc data present(ke,vel)
+    #pragma acc loop reduction(+:ke)
     for ( i = 0; i < nd; i++ )
     {
-      ke = ke + vel[i+k*nd] * vel[i+k*nd];
+      // printf("%8f\n",vel[i+k*nd]);
+      ke += vel[i+k*nd] * vel[i+k*nd];
     }
+    
   }
 
   ke = ke * 0.5 * mass;
@@ -481,10 +489,10 @@ void update ( int np, int nd, double pos[], double vel[], double f[],
 
 // # pragma omp for
 #pragma acc data copyin(f[:np*nd],dt,nd,np,rmass),copy(pos[:np*nd],acc[:np*nd],vel[:np*nd])
-#pragma acc kernels
+#pragma acc parallel loop
   for ( j = 0; j < np; j++ )
   {
-    // #pragma acc loop
+    #pragma acc loop
     for ( i = 0; i < nd; i++ )
     {
       pos[i+j*nd] = pos[i+j*nd] + vel[i+j*nd] * dt + 0.5 * acc[i+j*nd] * dt * dt;
