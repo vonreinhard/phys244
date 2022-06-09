@@ -1,4 +1,4 @@
-# Credit
+# Guidance
 
 ## OpenMP code author
 
