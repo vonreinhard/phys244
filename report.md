@@ -1,7 +1,7 @@
 # <center>Final Report</center>
 <center>TzuKao Wang (A59010714)</center>
-<center>Jack Sun</center>
-<center>Zhengtong Zhang</center>
+<center>Jack Sun (A16062902)</center>
+<center>Zhengtong Zhang (A59011254)</center>
 
 ## Section 1 Introduction
 Molecular dynamics is a kind of simulation method to analyze atoms and
@@ -24,7 +24,7 @@ We will describe the developing process for each parallelize method, including t
 ### 3.1 OpenMP
 
 ### 3.2 OpenACC
-
+Since OpenAcc is much similar with OpenMP, its developing process could refer from the OpenMp version. For the $\mathbf{update}$, it seems that we could directly parallel them withm three matrixs copy and force matrix just need to be sent to device without sending back. $\mathbf{compute}$ function , the situation is more complex but we still could handle it. When we look at potential and kinetic, we are doing the combination. Thus, we could use the reduction. Furthermore, for other computation we found the rij(distance for different particle) and degree could be used privately. Thus. after implementing those method, we success finished the OpenAcc version.
 ### 3.3 CUDA
 From my observation, there are two part we need to do the parallelization which first part is $\mathbf{compute}$ function and the other is $\mathbf{update}$ part.
 
@@ -50,7 +50,9 @@ In the remaining unparallelized program, we found that we could swith k and j no
 
 
 ## Section 6 Future work 
-For CUDA, we may use some method to parallelized the j loop. But this need more syncronization problem.
+For CUDA, we may use some method to parallelized the j loop. But this need more syncronization problem. Besides, the reduction could be optimized more. BUt due to time limitation, we would left it in the next step for our project.
+
+For OpenAcc version, we will try to reduce the action for sent the data from fots to device and back. We believe it could optimized our result in the future.
 
 ## Reference
 [1] John burkardt. (n.d.). Md_openmp.

@@ -167,13 +167,7 @@ void compute ( int np, int nd, double pos[], double vel[],
 
   pe = 0.0;
   ke = 0.0;
-
-// # pragma omp parallel \
-//   shared ( f, nd, np, pos, vel ) \
-//   private ( i, j, k, rij, d, d2 )
   
-// #pragma acc kernels
-// # pragma omp for reduction ( + : pe, ke )
 #pragma acc data copy(pe,ke,f[:np*nd]), copyin(pos[:np*nd],vel[:np*nd],nd,np,PI2)
 #pragma acc parallel loop reduction(+:ke,pe),private(i,j,k,rij,d,d2)
   for ( k = 0; k < np; k++ )
@@ -181,7 +175,6 @@ void compute ( int np, int nd, double pos[], double vel[],
 /*
   Compute the potential energy and forces.
 */
-    // #pragma acc data present(f)
     #pragma acc loop independent
     for ( i = 0; i < nd; i++ )
     {
@@ -199,7 +192,6 @@ void compute ( int np, int nd, double pos[], double vel[],
           rij[i] = pos[i+k*nd] - pos[i+j*nd];
           d = d + rij[i] * rij[i];
         }
-        // printf("%8f\n",d);
         d = sqrt ( d );
         if ( d < PI2 )
         {
@@ -225,7 +217,6 @@ void compute ( int np, int nd, double pos[], double vel[],
     #pragma acc loop reduction(+:ke)
     for ( i = 0; i < nd; i++ )
     {
-      // printf("%8f\n",vel[i+k*nd]);
       ke += vel[i+k*nd] * vel[i+k*nd];
     }
     
@@ -238,53 +229,7 @@ void compute ( int np, int nd, double pos[], double vel[],
 
   return;
 }
-/******************************************************************************/
 
-double dist ( int nd, double r1[], double r2[], double dr[] )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    DIST computes the displacement (and its norm) between two particles.
-
-  Licensing:
-
-    This code is distributed under the GNU LGPL license. 
-
-  Modified:
-
-    21 November 2007
-
-  Author:
-
-    Original FORTRAN77 version by Bill Magro.
-    C version by John Burkardt.
-
-  Parameters:
-
-    Input, int ND, the number of spatial dimensions.
-
-    Input, double R1[ND], R2[ND], the positions of the particles.
-
-    Output, double DR[ND], the displacement vector.
-
-    Output, double D, the Euclidean norm of the displacement.
-*/
-{
-  double d;
-  int i;
-
-  d = 0.0;
-  for ( i = 0; i < nd; i++ )
-  {
-    dr[i] = r1[i] - r2[i];
-    d = d + dr[i] * dr[i];
-  }
-  d = sqrt ( d );
-
-  return d;
-}
 /******************************************************************************/
 
 void initialize ( int np, int nd, double box[], int *seed, double pos[], 
@@ -483,11 +428,6 @@ void update ( int np, int nd, double pos[], double vel[], double f[],
 
   rmass = 1.0 / mass;
 
-// # pragma omp parallel \
-//   shared ( acc, dt, f, nd, np, pos, rmass, vel ) \
-//   private ( i, j )
-
-// # pragma omp for
 #pragma acc data copyin(f[:np*nd],dt,nd,np,rmass),copy(pos[:np*nd],acc[:np*nd],vel[:np*nd])
 #pragma acc parallel loop
   for ( j = 0; j < np; j++ )
