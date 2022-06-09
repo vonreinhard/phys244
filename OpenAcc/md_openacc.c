@@ -82,7 +82,6 @@ int main ( int argc, char *argv[] )
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
-  printf("%8.10f    %8.10f\n",e0,potential);
 /*
   This is the main time stepping loop:
     Compute forces and energies,
@@ -167,7 +166,7 @@ void compute ( int np, int nd, double pos[], double vel[],
 
   pe = 0.0;
   ke = 0.0;
-  
+
 #pragma acc data copy(pe,ke,f[:np*nd]), copyin(pos[:np*nd],vel[:np*nd],nd,np,PI2)
 #pragma acc parallel loop reduction(+:ke,pe),private(i,j,k,rij,d,d2)
   for ( k = 0; k < np; k++ )

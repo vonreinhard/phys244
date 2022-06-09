@@ -68,9 +68,6 @@ int main ( int argc, char *argv[] )
   int seed = 123456789;
   int step;
   int step_num = 20;
-  int step_print;
-  int step_print_index;
-  int step_print_num;
   double *vel;
   double wtime;
 
@@ -103,8 +100,6 @@ int main ( int argc, char *argv[] )
     box[i] = 10.0;
   }
 
-  printf ( "\n" );
-  printf ( "  Initializing positions, velocities, and accelerations.\n" );
 /*
   Set initial positions, velocities, and accelerations.
 */
@@ -112,53 +107,19 @@ int main ( int argc, char *argv[] )
 /*
   Compute the forces and energies.
 */
-  printf ( "\n" );
-  printf ( "  Computing initial forces and energies.\n" );
 
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
-/*
-  This is the main time stepping loop:
-    Compute forces and energies,
-    Update positions, velocities, accelerations.
-*/
-  printf ( "\n" );
-  printf ( "  At each step, we report the potential and kinetic energies.\n" );
-  printf ( "  The sum of these energies should be a constant.\n" );
-  printf ( "  As an accuracy check, we also print the relative error\n" );
-  printf ( "  in the total energy.\n" );
-  printf ( "\n" );
-  printf ( "      Step      Potential       Kinetic        (P+K-E0)/E0\n" );
-  printf ( "                Energy P        Energy K       Relative Energy Error\n" );
-  printf ( "\n" );
-
-  step_print = 0;
-  step_print_index = 0;
-  step_print_num = 10;
   
   step = 0;
-  printf ( "  %8d  %14f  %14f  %14e\n",
-    step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
-  step_print_index = step_print_index + 1;
-  step_print = ( step_print_index * step_num ) / step_print_num;
 
   wtime = omp_get_wtime ( );
 
   for ( step = 1; step <= step_num; step++ )
   {
     compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
-
-    if ( step == step_print )
-    {
-      printf ( "  %8d  %14f  %14f  %14e\n", step, potential, kinetic,
-       ( potential + kinetic - e0 ) / e0 );
-      step_print_index = step_print_index + 1;
-      step_print = ( step_print_index * step_num ) / step_print_num;
-    }
-    printf ( "%14f\n",pos[0] );
     update ( np, nd, pos, vel, force, acc, mass, dt );
-    printf ( "%14f\n",pos[0] );
     // printf ( "%8d\n",pos );
   }
   wtime = omp_get_wtime ( ) - wtime;

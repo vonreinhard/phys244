@@ -17,12 +17,12 @@ module purge
 module load slurm
 module load gpu
 module load cuda
-nvcc CUDA/md_openmp.cu -o md.o
+nvcc CUDA/md_openmp.cu -o CUDA/md.o
 #
 for i in 1
 do
   echo "Test"
-  ./md.o
+  ./CUDA//md.o
   if [ $? -ne 0 ]; then
     echo "Run error."
     exit
