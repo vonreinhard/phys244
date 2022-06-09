@@ -6,60 +6,52 @@
 #include "timer.h"
 #include <time.h>
 
-
 int main ( int argc, char *argv[] );
-void compute ( int np, int nd, float pos[], float vel[], 
-  float mass, float f[], float *pot, float *kin );
-// float dist ( int nd, float r1[], float r2[], float dr[] );
-void initialize ( int np, int nd, float box[], int *seed, float pos[], 
-  float vel[], float acc[] );
-float r8_uniform_01 ( int *seed );
+void compute ( int np, int nd, double pos[], double vel[], 
+  double mass, double f[], double *pot, double *kin );
+double dist ( int nd, double r1[], double r2[], double dr[] );
+void initialize ( int np, int nd, double box[], int *seed, double pos[], 
+  double vel[], double acc[] );
+double r8_uniform_01 ( int *seed );
 void timestamp ( );
-void update ( int np, int nd, float pos[], float vel[], float f[], 
-  float acc[], float mass, float dt );
+void update ( int np, int nd, double pos[], double vel[], double f[], 
+  double acc[], double mass, double dt );
 
+/******************************************************************************/
 
 int main ( int argc, char *argv[] )
 {
-  // float *acc;
-  // float *box;
-  // float *force;
-  // float *pos;
-  // float *vel;
-
-  float dt = 0.0001;
-  float e0;
+  double *acc;
+  double *box;
+  double dt = 0.0001;
+  double e0;
+  double *force;
   int i;
-  float kinetic;
-  float mass = 1.0;
+  double kinetic;
+  double mass = 1.0;
   int nd = 3;
   int np = 1000;
-  float potential;
+  double *pos;
+  double potential;
   int seed = 123456789;
   int step;
-  int step_num = 400;
+  int step_num = 100;
   int step_print;
   int step_print_index;
   int step_print_num;
-  float wtime;
+  double *vel;
 
   timestamp ( );
 
-  float *box = ( float * ) malloc ( nd * sizeof ( float ) );
-
-  float *restrict acc;
-  float *restrict force;
-  float *restrict pos;
-  float *restrict vel;
-
-  acc = ( float * ) malloc ( nd * np * sizeof ( float ) );
-  force = ( float * ) malloc ( nd * np * sizeof ( float ) );
-  pos = ( float * ) malloc ( nd * np * sizeof ( float ) );
-  vel = ( float * ) malloc ( nd * np * sizeof ( float ) );
+  acc = ( double * ) malloc ( nd * np * sizeof ( double ) );
+  box = ( double * ) malloc ( nd * sizeof ( double ) );
+  force = ( double * ) malloc ( nd * np * sizeof ( double ) );
+  pos = ( double * ) malloc ( nd * np * sizeof ( double ) );
+  vel = ( double * ) malloc ( nd * np * sizeof ( double ) );
 
   printf ( "\n" );
-  printf ( "MD_OPENACC\n" );
-  printf ( "  C/OpenACC version\n" );
+  printf ( "MD_OPENMP\n" );
+  printf ( "  C/OpenMP version\n" );
   printf ( "  A molecular dynamics program.\n" );
 
   printf ( "\n" );
@@ -67,9 +59,6 @@ int main ( int argc, char *argv[] )
   printf ( "  STEP_NUM, the number of time steps, is %d\n", step_num );
   printf ( "  DT, the size of each time step, is %f\n", dt );
 
-//   printf ( "\n" );
-//   printf ( "  Number of processors available = %d\n", omp_get_num_procs ( ) );
-//   printf ( "  Number of threads =              %d\n", omp_get_max_threads ( ) );
 /*
   Set the dimensions of the box.
 */
@@ -93,6 +82,7 @@ int main ( int argc, char *argv[] )
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
+  printf("%8.10f    %8.10f\n",e0,potential);
 /*
   This is the main time stepping loop:
     Compute forces and energies,
@@ -118,10 +108,8 @@ int main ( int argc, char *argv[] )
   step_print_index = step_print_index + 1;
   step_print = ( step_print_index * step_num ) / step_print_num;
 
-  // #pragma acc data copyin(force[:nd+(np*nd)], acc[:nd+(np*nd)], pos[:nd+(np*nd)], vel[:nd+(np*nd)], dt, nd, np, mass)
-
-  wtime = GetTimer();
-
+  StartTimer();
+// #pragma acc data copy(pos,vel,acc,force) , kernels
   for ( step = 1; step <= step_num; step++ )
   {
     compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
@@ -133,14 +121,16 @@ int main ( int argc, char *argv[] )
       step_print_index = step_print_index + 1;
       step_print = ( step_print_index * step_num ) / step_print_num;
     }
+    // printf ( "%14f\n",pos[0] );
     update ( np, nd, pos, vel, force, acc, mass, dt );
+    // printf ( "%14f\n",pos[0] );
+    // printf ( "%8d\n",pos );
   }
-
-  wtime =GetTimer() - wtime;
+  double runtime = GetTimer();
 
   printf ( "\n" );
   printf ( "  Elapsed time for main computation:\n" );
-  printf ( "  %f seconds.\n", wtime );
+  printf ( "  %f seconds.\n", runtime/1000 );
 /*
   Free memory.
 */
@@ -153,28 +143,27 @@ int main ( int argc, char *argv[] )
   Terminate.
 */
   printf ( "\n" );
-  printf ( "MD_OPENACC\n" );
+  printf ( "MD_OPENMP\n" );
   printf ( "  Normal end of execution.\n" );
   printf ( "\n" );
   timestamp ( );
 
   return 0;
 }
-
 /******************************************************************************/
 
-void compute ( int np, int nd, float pos[], float vel[], 
-  float mass, float f[], float *pot, float *kin )
+void compute ( int np, int nd, double pos[], double vel[], 
+  double mass, double f[], double *pot, double *kin )
 {
-  // float d;
-  // float d2;
-  // int i;
-  // int j;
-  // int k;
-  float rij[3];
-  float ke;
-  float pe;
-  // float PI2 = 3.141592653589793 / 2.0;
+  double d;
+  double d2;
+  int i;
+  int j;
+  int k;
+  double ke;
+  double pe;
+  double PI2 = 3.141592653589793 / 2.0;
+  double rij[3];
 
   pe = 0.0;
   ke = 0.0;
@@ -182,75 +171,65 @@ void compute ( int np, int nd, float pos[], float vel[],
 // # pragma omp parallel \
 //   shared ( f, nd, np, pos, vel ) \
 //   private ( i, j, k, rij, d, d2 )
+  
+// #pragma acc kernels
 // # pragma omp for reduction ( + : pe, ke )
-
-#pragma acc data copyin(f[:nd+(np*nd)], pos[:nd], vel[:nd], nd, np) 
-#pragma acc data copy(pe, ke)
-
-// #pragma acc update device(rij[0:nd])
-// #pragma acc kernels 
-// #pragma acc region 
-#pragma acc parallel loop gang vector private(rij)
-  for ( int k = 0; k < np; k++ )
+#pragma acc data copy(pe,ke,f[:np*nd]), copyin(pos[:np*nd],vel[:np*nd],nd,np,PI2)
+#pragma acc parallel loop reduction(+:ke,pe),private(i,j,k,rij,d,d2)
+  for ( k = 0; k < np; k++ )
   {
 /*
   Compute the potential energy and forces.
 */
-    for ( int i = 0; i < nd; i++ )
+    // #pragma acc data present(f)
+    #pragma acc loop independent
+    for ( i = 0; i < nd; i++ )
     {
       f[i+k*nd] = 0.0;
     }
-
-    #pragma acc loop reduction(+ : pe) 
-      for ( int j = 0; j < np; j++ )
+    #pragma acc loop reduction(+:pe)
+    for ( j = 0; j < np; j++ )
+    {
+      if ( k != j )
       {
-        if ( k != j )
+        d = 0.0;
+        #pragma acc loop
+        for ( i = 0; i < nd; i++ )
         {
-          // float rij[3]; 
-          // d = dist ( nd, pos+k*nd, pos+j*nd, rij );
+          rij[i] = pos[i+k*nd] - pos[i+j*nd];
+          d = d + rij[i] * rij[i];
+        }
+        // printf("%8f\n",d);
+        d = sqrt ( d );
+        if ( d < PI2 )
+        {
+          d2 = d;
+        }
+        else
+        {
+          d2 = PI2;
+        }
 
-          float d = 0.0;
-          #pragma acc loop
-            for ( int i = 0; i < nd; i++ )
-            {
-              rij[i] = (pos+k*nd)[i] - (pos+j*nd)[i];
-              d = d + rij[i] * rij[i];
-            }
-          d = sqrt ( d );
-  /*
-    Attribute half of the potential energy to particle J.
-  */      
-          float d2;
-          float PI2 = 3.141592653589793 / 2.0;
-          if ( d < PI2 )
-          {
-            d2 = d;
-          }
-          else
-          {
-            d2 = PI2;
-          }
-
-          pe = pe + 0.5 * pow ( sin ( d2 ), 2 );
-
-          #pragma acc loop 
-            for ( int i = 0; i < nd; i++ )
-            {
-              f[i+k*nd] = f[i+k*nd] - rij[i] * sin ( 2.0 * d2 ) / d;
-            }
+        pe = pe + 0.5 * pow ( sin ( d2 ), 2 );
+        #pragma acc loop
+        for ( i = 0; i < nd; i++ )
+        {
+          f[i+k*nd] = f[i+k*nd] - rij[i] * sin ( 2.0 * d2 ) / d;
         }
       }
+    }
 /*
   Compute the kinetic energy.
-*/
-    #pragma acc loop reduction(+ : ke)
-      for ( int i = 0; i < nd; i++ )
-      {
-        ke = ke + vel[i+k*nd] * vel[i+k*nd];
-      }
+*/  
+    // #pragma acc data present(ke,vel)
+    #pragma acc loop reduction(+:ke)
+    for ( i = 0; i < nd; i++ )
+    {
+      // printf("%8f\n",vel[i+k*nd]);
+      ke += vel[i+k*nd] * vel[i+k*nd];
+    }
+    
   }
-
-  // #pragma acc update host(pe, ke)
 
   ke = ke * 0.5 * mass;
   
@@ -259,30 +238,67 @@ void compute ( int np, int nd, float pos[], float vel[],
 
   return;
 }
-
 /******************************************************************************/
 
-// float dist ( int nd, float r1[], float r2[], float dr[] )
-// {
-//   float d;
-//   int i;
-
-//   d = 0.0;
-//   // #pragma acc kernels
-//     for ( i = 0; i < nd; i++ )
-//     {
-//       dr[i] = r1[i] - r2[i];
-//       d = d + dr[i] * dr[i];
-//     }
-//   d = sqrt ( d );
-
-//   return d;
-// }
+double dist ( int nd, double r1[], double r2[], double dr[] )
 
 /******************************************************************************/
+/*
+  Purpose:
+    DIST computes the displacement (and its norm) between two particles.
+  Licensing:
+    This code is distributed under the GNU LGPL license. 
+  Modified:
+    21 November 2007
+  Author:
+    Original FORTRAN77 version by Bill Magro.
+    C version by John Burkardt.
+  Parameters:
+    Input, int ND, the number of spatial dimensions.
+    Input, double R1[ND], R2[ND], the positions of the particles.
+    Output, double DR[ND], the displacement vector.
+    Output, double D, the Euclidean norm of the displacement.
+*/
+{
+  double d;
+  int i;
 
-void initialize ( int np, int nd, float box[], int *seed, float pos[], 
-  float vel[], float acc[] )
+  d = 0.0;
+  for ( i = 0; i < nd; i++ )
+  {
+    dr[i] = r1[i] - r2[i];
+    d = d + dr[i] * dr[i];
+  }
+  d = sqrt ( d );
+
+  return d;
+}
+/******************************************************************************/
+
+void initialize ( int np, int nd, double box[], int *seed, double pos[], 
+  double vel[], double acc[] )
+
+/******************************************************************************/
+/*
+  Purpose:
+    INITIALIZE initializes the positions, velocities, and accelerations.
+  Licensing:
+    This code is distributed under the GNU LGPL license. 
+  Modified:
+    21 November 2007
+  Author:
+    Original FORTRAN77 version by Bill Magro.
+    C version by John Burkardt.
+  Parameters:
+    Input, int NP, the number of particles.
+    Input, int ND, the number of spatial dimensions.
+    Input, double BOX[ND], specifies the maximum position
+    of particles in each dimension.
+    Input, int *SEED, a seed for the random number generator.
+    Output, double POS[ND*NP], the position of each particle.
+    Output, double VEL[ND*NP], the velocity of each particle.
+    Output, double ACC[ND*NP], the acceleration of each particle.
+*/
 {
   int i;
   int j;
@@ -313,13 +329,44 @@ void initialize ( int np, int nd, float box[], int *seed, float pos[],
   }
   return;
 }
-
 /******************************************************************************/
 
-float r8_uniform_01 ( int *seed )
+double r8_uniform_01 ( int *seed )
+
+/******************************************************************************/
+/*
+  Purpose:
+    R8_UNIFORM_01 is a unit pseudorandom R8.
+  Discussion:
+    This routine implements the recursion
+      seed = 16807 * seed mod ( 2**31 - 1 )
+      unif = seed / ( 2**31 - 1 )
+    The integer arithmetic never requires more than 32 bits,
+    including a sign bit.
+  Licensing:
+    This code is distributed under the GNU LGPL license. 
+  Modified:
+    11 August 2004
+  Author:
+    John Burkardt
+  Reference:
+    Paul Bratley, Bennett Fox, Linus Schrage,
+    A Guide to Simulation,
+    Springer Verlag, pages 201-202, 1983.
+    Bennett Fox,
+    Algorithm 647:
+    Implementation and Relative Efficiency of Quasirandom
+    Sequence Generators,
+    ACM Transactions on Mathematical Software,
+    Volume 12, Number 4, pages 362-376, 1986.
+  Parameters:
+    Input/output, int *SEED, a seed for the random number generator.
+    Output, double R8_UNIFORM_01, a new pseudorandom variate, strictly between
+    0 and 1.
+*/
 {
   int k;
-  float r;
+  double r;
 
   k = *seed / 127773;
 
@@ -330,14 +377,29 @@ float r8_uniform_01 ( int *seed )
     *seed = *seed + 2147483647;
   }
 
-  r = ( float ) ( *seed ) * 4.656612875E-10;
+  r = ( double ) ( *seed ) * 4.656612875E-10;
 
   return r;
 }
-
 /******************************************************************************/
 
 void timestamp ( void )
+
+/******************************************************************************/
+/*
+  Purpose:
+    TIMESTAMP prints the current YMDHMS date as a time stamp.
+  Example:
+    31 May 2001 09:45:54 AM
+  Licensing:
+    This code is distributed under the GNU LGPL license. 
+  Modified:
+    24 September 2003
+  Author:
+    John Burkardt
+  Parameters:
+    None
+*/
 {
 # define TIME_SIZE 40
 
@@ -355,32 +417,28 @@ void timestamp ( void )
   return;
 # undef TIME_SIZE
 }
-
 /******************************************************************************/
 
-void update ( int np, int nd, float pos[], float vel[], float f[], 
-  float acc[], float mass, float dt )
+void update ( int np, int nd, double pos[], double vel[], double f[], 
+  double acc[], double mass, double dt )
 {
-  // int i;
-  // int j;
-  float rmass = 1.0 / mass;
+  int i;
+  int j;
+  double rmass;
+
+  rmass = 1.0 / mass;
 
 // # pragma omp parallel \
 //   shared ( acc, dt, f, nd, np, pos, rmass, vel ) \
 //   private ( i, j )
+
 // # pragma omp for
-
-#pragma acc data copyin(f[:nd+(np*nd)], acc[:nd+(np*nd)], pos[:nd+(np*nd)], vel[:nd+(np*nd)], dt, nd, np, rmass)
-
-// #pragma acc kernels
-// #pragma acc region
-// #pragma acc loop independent vector(16)
-
+#pragma acc data copyin(f[:np*nd],dt,nd,np,rmass),copy(pos[:np*nd],acc[:np*nd],vel[:np*nd])
 #pragma acc parallel loop
-  for (int j = 0; j < np; j++ )
+  for ( j = 0; j < np; j++ )
   {
     #pragma acc loop
-    for (int i = 0; i < nd; i++ )
+    for ( i = 0; i < nd; i++ )
     {
       pos[i+j*nd] = pos[i+j*nd] + vel[i+j*nd] * dt + 0.5 * acc[i+j*nd] * dt * dt;
       vel[i+j*nd] = vel[i+j*nd] + 0.5 * dt * ( f[i+j*nd] * rmass + acc[i+j*nd] );
