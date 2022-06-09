@@ -15,6 +15,19 @@ void timestamp ( );
 
 #define gridSize 4
 #define blockSize 1024
+/*********************************/
+// Do the update 
+// Input :
+//         np,  number of particle
+//         nd,  number of dimension
+//         force, the force
+//         mass, the mass of particle
+//         dt,  the difference of time
+// Output:
+//         pos,  particle posiion
+//         vel,  particle velocity
+//         acc,  particle accelation rate
+/*********************************/
 __global__ void update ( int np, int nd, double* pos, double* vel, double* f, double* acc, double mass, double dt )
 {
  
@@ -26,7 +39,6 @@ __global__ void update ( int np, int nd, double* pos, double* vel, double* f, do
 
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride = gridDim.x*blockDim.x;
-  // printf("%8d\n",idx);
   while(idx < (np*nd) ){
 
     pos[idx] = pos[idx] + vel[idx] * dt + 0.5 * acc[idx] * dt * dt;
@@ -37,6 +49,16 @@ __global__ void update ( int np, int nd, double* pos, double* vel, double* f, do
 
   return;
 }
+/*********************************/
+// Compute rij and d for later uses
+// Input :
+//         np,  number of particle
+//         nd,  number of dimension
+//         force, the force
+//         pos,  particle posiion
+// Output:
+//         d  particle d
+//         rij,  distance from this position to j postion
 /*********************************/
 __global__ void compute_rd ( int np, int nd, double* pos,int j,double *d,double *rij){
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -49,8 +71,6 @@ __global__ void compute_rd ( int np, int nd, double* pos,int j,double *d,double 
     if(k!=j){
       rij[idx] = pos[idx] - pos[idx-nd*(k-j)];
       d[idx] = rij[idx]*rij[idx];
-      
-
 
     }else{
       d[idx] = 0;
@@ -58,6 +78,16 @@ __global__ void compute_rd ( int np, int nd, double* pos,int j,double *d,double 
     idx+=stride;
   }
 }
+/*********************************/
+// Compute d2 and pe
+// Input :
+//         np,  number of particle
+//         nd,  number of dimension
+//         d,  particle d
+// Output:
+//         d2,  based on d
+//         pe,  potential for this situation
+/*********************************/
 __global__ void compute_d2 ( int np, int nd,double *d,double *d2,double *pe){
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   double PI2 = 3.141592653589793 / 2.0;
@@ -77,6 +107,19 @@ __global__ void compute_d2 ( int np, int nd,double *d,double *d2,double *pe){
     idx+=stride;
   }
 }
+/*********************************/
+// Update force
+// Input :
+//         np,  number of particle
+//         nd,  number of dimension
+//         d,  particle d
+//         d2,  based on d
+//         rij,  distance from this position to j postion
+//         j, current j
+// Output:
+//         
+//         force, the force of particle
+/*********************************/
 __global__ void compute_f ( int np, int nd,double *d,double *d2,double *f,double *rij,int j){
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int stride = gridDim.x*blockDim.x;
@@ -94,7 +137,17 @@ __global__ void compute_f ( int np, int nd,double *d,double *d2,double *f,double
   __syncthreads();
     
 }
-/********************************************************************************/
+/*********************************/
+// Reduction for pe
+// Input :
+//         np,  number of particle
+//         nd,  number of dimension
+//         pe,  potential
+//         j, current j
+// Output:
+//         
+//         OUT, reduction result
+/*********************************/
 __global__  void add_pe(double *pe,int np,int nd,double *OUT,int j){
   __shared__ double sdata[1000];
  int tid = threadIdx.x;
@@ -122,13 +175,22 @@ __global__  void add_pe(double *pe,int np,int nd,double *OUT,int j){
   OUT[j] = pe[0];
  }
 }
-// compute ke;
-/********************************************************************************/
+/*********************************/
+// Reduction for ke
+// Input :
+//         np,  number of particle
+//         nd,  number of dimension
+//         ke,  potential
+//         mass, particle mass
+//         vel, particle velocity
+//         j, current j
+// Output:
+//         ke[0],  reduction result
+/*********************************/
 __global__  void add_ke(double *ke,double* vel,int np,int nd, double mass){
   __shared__ double sdata[1000];
  int tid = threadIdx.x;
  int i = blockIdx.x*blockDim.x+tid;
-//  printf("%8d\n",i);
   sdata[tid] = 0;
  if(i>=np*nd)return;
  if(gridDim.x!=1){
@@ -149,16 +211,6 @@ __global__  void add_ke(double *ke,double* vel,int np,int nd, double mass){
  if(tid==0)ke[blockIdx.x]=sdata[0];
  if(blockIdx.x*blockDim.x+tid==0&&gridDim.x==1)ke[0]*=0.5*mass;
 }
-
-/******************************************************************************/
-void outputval(double *val,int np,int nd){
-  for(int i=0;i<np;i++){
-    for(int j=0;j<nd;j++){
-      printf("%4f ",val[i*nd+j]);
-    }
-    printf("\n");
-  }
-}
 int main ( int argc, char *argv[] )
 {
   double *acc;
@@ -176,11 +228,7 @@ int main ( int argc, char *argv[] )
   int seed = 123456789;
   int step;
   int step_num = 100;
-  int step_print;
-  int step_print_index;
-  int step_print_num;
   double *vel;
-  // double wtime;
 
   timestamp ( );
 
@@ -189,16 +237,6 @@ int main ( int argc, char *argv[] )
   force = ( double * ) malloc ( nd * np * sizeof ( double ) );
   pos = ( double * ) malloc ( nd * np * sizeof ( double ) );
   vel = ( double * ) malloc ( nd * np * sizeof ( double ) );
-
-  printf ( "\n" );
-  printf ( "MD_OPENMP\n" );
-  printf ( "  C/OpenMP version\n" );
-  printf ( "  A molecular dynamics program.\n" );
-
-  printf ( "\n" );
-  printf ( "  NP, the number of particles in the simulation is %d\n", np );
-  printf ( "  STEP_NUM, the number of time steps, is %d\n", step_num );
-  printf ( "  DT, the size of each time step, is %f\n", dt );
 
   
 /*
@@ -209,8 +247,6 @@ int main ( int argc, char *argv[] )
     box[i] = 10.0;
   }
 
-  printf ( "\n" );
-  printf ( "  Initializing positions, velocities, and accelerations.\n" );
 /*
   Set initial positions, velocities, and accelerations.
 */
@@ -218,9 +254,9 @@ int main ( int argc, char *argv[] )
 /*
   Compute the forces and energies.
 */
-  printf ( "\n" );
-  printf ( "  Computing initial forces and energies.\n" );
-  // memalloc
+/*
+  Allocate all value it will use at here
+*/
   double* d_acc, *d_force,*d_pos,*d_vel,*ke,*d,*d2,*pe,*rij,*sumpe;
   cudaMalloc(&d_acc, nd * np * sizeof ( double ));
   cudaMalloc(&d_force, nd * np * sizeof ( double ));
@@ -232,32 +268,39 @@ int main ( int argc, char *argv[] )
   cudaMalloc(&d, nd * np *sizeof ( double ));
   cudaMalloc(&d2, np *sizeof ( double ));
   cudaMalloc(&sumpe, np *sizeof ( double ));
-  // compute sth
+/*
+  For initialization we need to copy pos,vel,acc to device and set force as 0
+*/
   cudaMemset(d_force,0.0,nd * np * sizeof ( double ));
   cudaMemcpy(d_pos, pos, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
   cudaMemcpy(d_vel, vel, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
   cudaMemcpy(d_acc, acc, nd * np * sizeof ( double ), cudaMemcpyHostToDevice);
-  // outputval(force,np,nd);
   potential = 0.0;
-  // double total_pe = 0.0;
+/*
+  Parallelize it under j loop
+*/
   for(int j=0;j<np;j++){
-
+/*
+  Do compute
+*/
     compute_rd<< <gridSize, blockSize >> > (np, nd, d_pos, j, d,rij);
     compute_d2 << <gridSize, blockSize >> >(np, nd, d, d2, pe);
     compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij,j);
-
+/*
+  pe add reduction
+*/
     add_pe<< <gridSize, blockSize >> >(pe,1,np,sumpe,j);
-    
-    // double tmp_pe;
-    // cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
-    // total_pe += tmp_pe;
   }
+/*
+  pe add reduction
+*/
   add_pe<< <gridSize, blockSize >> >(sumpe,1,np,sumpe,0);
   double tmp_pe;
   cudaMemcpy(&tmp_pe, sumpe, sizeof ( double ), cudaMemcpyDeviceToHost);
-  printf("%8f\n",tmp_pe);
   potential = tmp_pe;
-
+/*
+  ke add reduction
+*/
   add_ke<< <gridSize, blockSize >> >(ke,d_vel,np,nd,mass);
   if(gridSize>1)
     add_ke<< <1, blockSize >> >(ke,ke,1,blockSize,mass);
@@ -266,41 +309,14 @@ int main ( int argc, char *argv[] )
   kinetic = tmp;
   
   e0 = potential + kinetic;
-  
-/*
-  This is the main time stepping loop:
-    Compute forces and energies,
-    Update positions, velocities, accelerations.
-*/
-  printf ( "\n" );
-  printf ( "  At each step, we report the potential and kinetic energies.\n" );
-  printf ( "  The sum of these energies should be a constant.\n" );
-  printf ( "  As an accuracy check, we also print the relative error\n" );
-  printf ( "  in the total energy.\n" );
-  printf ( "\n" );
-  printf ( "      Step      Potential       Kinetic        (P+K-E0)/E0\n" );
-  printf ( "                Energy P        Energy K       Relative Energy Error\n" );
-  printf ( "\n" );
-
-  step_print = 0;
-  step_print_index = 0;
-  step_print_num = 10;
-  
-  step = 0;
-  printf ( "  %8d  %14f  %14f  %14e\n",
-    step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
-  step_print_index = step_print_index + 1;
-  step_print = ( step_print_index * step_num ) / step_print_num;
-
+ 
   StartTimer();;
-  // parameter initialization
   
   
   for ( step = 1; step <= step_num; step++ )
   {
     
     cudaMemset(d_force,0.0000000,nd * np * sizeof ( double ));
-    // cudaMemcpy(force, d_force, nd * np * sizeof ( double ), cudaMemcpyDeviceToHost);
     
     potential = 0.0;
     for(int j=0;j<np;j++){
@@ -311,41 +327,29 @@ int main ( int argc, char *argv[] )
       compute_f<< <gridSize, blockSize >> >  (np,nd,d,d2,d_force,rij,j);
 
       add_pe<< <gridSize, blockSize >> >(pe,1,np,sumpe,j);
-      // tmp_pe<< <    1   ,      1    >> >(sumpe,pe,j);
-      // double tmp_pe;
-      // cudaMemcpy(&tmp_pe, pe, sizeof ( double ), cudaMemcpyDeviceToHost);
-      // total_pe += tmp_pe;
-
     }
+ /*
+  pe add reduction
+*/   
     add_pe<< <gridSize, blockSize >> >(sumpe,1,np,sumpe,0);
     double tmp_pe;
     cudaMemcpy(&tmp_pe, sumpe, sizeof ( double ), cudaMemcpyDeviceToHost);
-    // double *f = ( double * ) malloc ( nd * np * sizeof ( double ) );
-    //   cudaMemcpy(f, d_force, np*nd*sizeof ( double ), cudaMemcpyDeviceToHost);
-    // outputval(f,np,nd);
     potential = tmp_pe;
-    
+ /*
+  ke add reduction
+*/   
   
-    
-    
-    
-
-    // compute ke
     add_ke<< <gridSize, blockSize >> >(ke,d_vel,np,nd,mass);
     if(gridSize>1)
       add_ke<< <1, blockSize >> >(ke,ke,1,blockSize,mass);
     double tmp;
     cudaMemcpy(&tmp, ke, sizeof ( double ), cudaMemcpyDeviceToHost);
     kinetic = tmp;
-    if ( step == step_print )
-    {
-      printf ( "  %8d  %14f  %14f  %14e\n",
-    step, potential, kinetic, ( potential + kinetic - e0 ) / e0 );
-      step_print_index = step_print_index + 1;
-      step_print = ( step_print_index * step_num ) / step_print_num;
-    }
+    
    
-
+/*
+  do updation
+*/ 
     update<< <gridSize, blockSize >> > ( np, nd, d_pos, d_vel, d_force, d_acc, mass, dt );
  
   }
@@ -362,7 +366,9 @@ int main ( int argc, char *argv[] )
   free ( force );
   free ( pos );
   free ( vel );
-  // cuda
+/*
+  Free cuda memory.
+*/ 
   cudaFree ( d_acc );
   cudaFree ( d_force );
   cudaFree ( d_pos );
@@ -379,7 +385,6 @@ int main ( int argc, char *argv[] )
   Terminate.
 */
   printf ( "\n" );
-  printf ( "MD_OPENMP\n" );
   printf ( "  Normal end of execution.\n" );
   printf ( "\n" );
   timestamp ( );
