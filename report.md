@@ -98,14 +98,17 @@ Threads tests are only run under the openMP method.
 
 
 ### 4.1 OpenMP
-![image info](./newfolder/cuda/datable.png)
-![image info](./cuda/plot.png)
+![image info](./newfolder/openmp/loopdata.png)
+![image info](./newfolder/openmp/threadTable.png)
+![image info](./newfolder/openmp/datatable.png)
 ### 4.2 OpenACC
-
+![image info](./newfolder/openACC/plot.png)
+![image info](./newfolder/openACC/datatable.png)
 ### 4.3 CUDA
-
+![image info](./newfolder/cuda/plot.png)
+![image info](./newfolder/cuda/datatable.png)
 ## Section 5 Conclusion
-
+Based on the plot and data table from 
 
 
 
