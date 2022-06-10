@@ -98,7 +98,7 @@ Threads tests are only run under the openMP method.
 
 
 ### 4.1 OpenMP
-![image info](./cuda/datable.png)
+![image info](./newfolder/cuda/datable.png)
 ![image info](./cuda/plot.png)
 ### 4.2 OpenACC
 
