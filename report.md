@@ -1,4 +1,4 @@
-# <center>Final Report</center>
+#  Final Report
 <center>TzuKao Wang (A59010714)</center>
 <center>Jack Sun (A16062902)</center>
 <center>Zhengtong Zhang (A59011254)</center>
