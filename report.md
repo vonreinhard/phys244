@@ -63,6 +63,7 @@ Since the OpenMP code is given [1](https://people.sc.fsu.edu/~jburkardt/cpp_src/
 The implementation of the molecular dynamics simulation is in the main function. The program uses OpenMP directives to allow parallel computation. The velocity Verlet time integration scheme is used. The particles interact with a central pair potential. After initializing the dimensions of the box, setting initial positions, velocities, and accelerations, we compute the forces and energies for the initial state. Then inside an iteration loop we set a total step and repeat the computation and update process several times. At the end we report the execution time. 
 
 The parallelision parts are mainly implemented in the $\mathbf{compute}$ function and the $\mathbf{update}$ function. We used "# pragma omp parallel" to declare shared and private variables and arrays in the parallelism process, and "# pragma omp for" to parallelize the for loop. And in the compute function, we used "reduction" clause to accumulate the kinetic and potential encery results. 
+
 ### 3.2 OpenACC
 Since OpenACC is much similar to OpenMP, its developing process could refer to the OpenMp version. Even though we successfully finished the OpenACC version, we faced a couple obstacles throughout implementing those methods. 
 
@@ -75,7 +76,8 @@ After considering the complaints by the compiler, we noticed that there are more
 With the above changes, we successfully parallelized the inner loops. However, all the arrays are reallocated in every iteration. Thus, we further modified the routine with an OpenACC data region before jumping into the calculation loop. We used the "copyin" instruction to create space for the variabels on the GPU device, and initialize the variables by copying data to the device at the beginning of the region. For variables like potential energy, kinetic energy and array like forces, we used the "copy" instruction to not only pass them to the device but also copy the results back to the host at the end of the region, and finally release the space on the device when done.
 
 For the $\mathbf{update}$, same as the compute function with the naive kernel implementation, the compiler outputs errors about complex variable dependencies in the loop. Thus, based on the previous implementation experience on compute function, we end up using parallel construct method to parallelize the update loop. We use the "copy" instruction to send position, acceleration and velocity arrays to the device and get them back to the host when finished. And for the force matrix, we just need to be sent to device without sending back using the "copyin" instruction in this case. 
-### 3.3 CUDA
+
+###  3.3 CUDA
 From my observation, there are two part we need to do the parallelization which first part is $\mathbf{compute}$ function and the other is $\mathbf{update}$ part.
 
 The later one is much easy since there is not data dependecy in this function and thus we could assign the thread to complete their tasks without waiting and communication with other threads.
