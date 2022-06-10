@@ -116,8 +116,7 @@ Based on the plot and data table from the three parallel methods above, we can h
 
 Beside the effect caused by different parameters, we also observe the runtime differences caused by different parallel methods. According to the graph,we have the runtime relationship as openACC > openMP > CUDA. openACC and openMP have close performance while CUDA performs much worse than the other two. The possible reason is that the j loop is not parallized and causes the unexpected performance.
 ## Section 5 Conclusion
-
-
+In this project, we successfully used three different parallel methods to perform Molecular dynamics, which is a kind of simulation method to analyze atoms and molecules’s physical movements. We design different test patterns for every parallel method and analyze the runtime result. The test pattern is made up of three different parameters, which are atom type, atom number, and thread. All the tests worked out well and we came up with a final statement based on the test result. However, the statement does not fully match our expectation since we did not convert all the loop into parallel in our CUDA method.
 
 
 ## Section 6 Future work 
