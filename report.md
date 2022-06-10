@@ -18,7 +18,7 @@ Our general purpose is to implement C code which carries out a molecular dynamic
 The system includes Np interacting particles, e.g. atoms, molecules, Hydrogen, Helium, Lithium, Carbon and Oxygen. Our model simulates their motion and detects their reactions. The following are some physics formulas we used to calculate the forces between the particles and the energy. 
 
 Forces of Particle i: 
-$\vec{f_{i}}=m_{i} \vec{a}_{i}=-\nabla_{i} U(t)$
+$\vec{f_i}=m_i \vec{a}_i=-\nabla_i U(t)$
 
 Potential Energy:
 $U(t)=\frac{1}{2} \sum_{\substack{i=1}}^{N} \sum_{\substack{j=1 \\ j \neq i}}^{N} U_{i, j}\left(\left\|\vec{r}_{i, j}\right\|\right)$
