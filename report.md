@@ -56,6 +56,7 @@ The time integration is fully parallel.
 ![image info](./pictures/update.png)
 ## Section 3 Developing Process
 We will describe the developing process for each parallelize method, including the chanllenges and the notion we made during developing.
+
 ### 3.1 OpenMP
 Since the OpenMP code is given [1](https://people.sc.fsu.edu/~jburkardt/cpp_src/md_openmp), the developing process we discuss here follows the comments in the given source code. 
 
@@ -106,3 +107,6 @@ For OpenAcc version, we will try to reduce the action for sent the data from fot
 ## Reference
 [1] John burkardt. (n.d.). Md_openmp.
 https://people.sc.fsu.edu/~jburkardt/cpp_src/md_openmp
+
+[2] OpenACC Programming and Best Practices Guide.
+https://www.openacc.org/sites/default/files/inline-files/OpenACC_Programming_Guide_0.pdf

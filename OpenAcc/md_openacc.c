@@ -82,7 +82,6 @@ int main ( int argc, char *argv[] )
   compute ( np, nd, pos, vel, mass, force, &potential, &kinetic );
 
   e0 = potential + kinetic;
-  printf("%8.10f    %8.10f\n",e0,potential);
 /*
   This is the main time stepping loop:
     Compute forces and energies,
@@ -229,6 +228,10 @@ void compute ( int np, int nd, double pos[], double vel[],
 
   return;
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/third
 /******************************************************************************/
 
 void initialize ( int np, int nd, double box[], int *seed, double pos[], 
