@@ -21,7 +21,7 @@ Forces of Particle i:
 $\vec{f_i}=m_i \vec{a}_i=-\nabla_i U(t)$
 
 Potential Energy:
-$U(t)=\frac{1}{2} \sum_{\substack{i=1}}^{N} \sum_{\substack{j=1 \\ j \neq i}}^{N} U_{i, j}\left(\left\|\vec{r}_{i, j}\right\|\right)$
+$U(t)=\frac{1}{2} \sum_{\substack{i=1}}^N \sum_{\substack{j=1 \\ j \neq i}}^N U_{i,j}\left(\left\|\vec{r}_{i,j}\right\|\right)$
 
 Kinetic Energy:
 $E_k = \frac{1}{2}mv^2$
