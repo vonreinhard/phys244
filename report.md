@@ -18,12 +18,10 @@ Our general purpose is to implement C code which carries out a molecular dynamic
 The system includes Np interacting particles, e.g. atoms, molecules, Hydrogen, Helium, Lithium, Carbon and Oxygen. Our model simulates their motion and detects their reactions. The following are some physics formulas we used to calculate the forces between the particles and the energy. 
 
 Forces of Particle i: 
-$\overrightarrow{f_{i}}=m_{i} \vec{a}_{i}=-\nabla_{i} U(t)$
+$\vec{f_{i}}=m_{i} \vec{a}_{i}=-\nabla_{i} U(t)$
 
 Potential Energy:
-$$
-U(t)=\frac{1}{2} \sum_{\substack{i=1}}^{N} \sum_{\substack{j=1 \\ j \neq i}}^{N} U_{i, j}\left(\left\|\vec{r}_{i, j}\right\|\right)
-$$
+$U(t)=\frac{1}{2} \sum_{\substack{i=1}}^{N} \sum_{\substack{j=1 \\ j \neq i}}^{N} U_{i, j}\left(\left\|\vec{r}_{i, j}\right\|\right)$
 
 Kinetic Energy:
 $E_k = \frac{1}{2}mv^2$
@@ -113,3 +111,6 @@ For OpenAcc version, we will try to reduce the action for sent the data from fot
 ## Reference
 [1] John burkardt. (n.d.). Md_openmp.
 https://people.sc.fsu.edu/~jburkardt/cpp_src/md_openmp
+
+[2] OpenACC Programming and Best Practices Guide.
+https://www.openacc.org/sites/default/files/inline-files/OpenACC_Programming_Guide_0.pdf
