@@ -12,13 +12,48 @@ movement in the future and hence simulate the whole process of the system.
 Since we could consider the system would become an ergodic system in the long term, the computation of each particles’ movement could be processed in the parallel approach. Thus we use OpenMP as the parallel computation method to assist the simulation of molecular dynamics. We will test the parallel program and develop the performance model based on the parameter of processors, the number of particles and the process time from computation and communcation. For further comparison, we will also utilizz OpenMC and Cuda method as other parallel technique for this program. 
 
 ## Section 2 Technique Appraoch
+Our general purpose is to implement C code which carries out a molecular dynamics simulation, using OpenMP, OpenAcc and Cuda separately for parallel execution. OpenMP takes a more generic approach compared to OpenACC and Cuda, it allows programmers to explicitly spread the execution of loops, code regions and tasks across teams of threads. OpenACC and Cuda use directives to tell the compiler where to parallelize loops, and how to manage data between host and accelerator memories. 
 
-### 2.1 OpenMp
+The system includes Np interacting particles, e.g. atoms, molecules, Hydrogen, Helium, Lithium, Carbon and Oxygen. Our model simulates their motion and detects their reactions. The following are some physics formulas we used to calculate the forces between the particles and the energy. 
 
-### 2.2 OpenACC
+Forces of Particle i: 
+$\vec{f_{i}}=m_{i} \vec{a}_{i}=-\nabla_{i} U(t)$
 
-### 2.3 CUDA
+Potential Energy:
+$U(t)=\frac{1}{2} \sum_{\substack{i=1}}^{N} \sum_{\substack{j=1 \\ j \neq i}}^{N} U_{i, j}\left(\left\|\vec{r}_{i, j}\right\|\right)$
 
+Kinetic Energy:
+$E_k = \frac{1}{2}mv^2$
+
+Next, let's have an overview of the main Molecular Dynamics routine. In the main function, we set a constant step of the iterations for the system simulation (S is the total step of the computation). In each step, there are two function calls, compute and update. The compute function calculates the potential, kinetic energy and force of each particle. And the update function renewals the position, velocity and acceleration of each particle after the computation. 
+
+![image info](./pictures/main.png)
+
+The the compute function, Nd is the number of spatial dimensions and Np is the number of particles. The compute function has a complexity of $O({Np}^2)$. 
+
+The potential function V(X) is a harmonic well which smoothly saturates to a maximum value at PI/2: 
+
+$v(x) = {( sin ( min ( x, PI2 ) ) )}^2$ 
+
+The derivative of the potential is: 
+
+$dv(x) = 2.0 * sin ( min ( x, PI2 ) ) * cos ( min ( x, PI2 ) ) = sin ( 2.0 * min ( x, PI2 ) )$
+
+The parallelization is implemented of computation of forces and energies.
+
+![image info](./pictures/compute.png)
+
+In the update function, a velocity Verlet algorithm is used for the updating.
+
+$p(t+dt) = p(t) + v(t) * dt + 0.5 * a(t) * dt * dt$
+
+$v(t+dt) = v(t) + 0.5 * ( a(t) + a(t+dt) ) * dt$
+
+$a(t+dt) = f(t) / m$
+
+The time integration is fully parallel.
+
+![image info](./pictures/update.png)
 ## Section 3 Developing Process
 We will describe the developing process for each parallelize method, including the chanllenges and the notion we made during developing.
 ### 3.1 OpenMP
