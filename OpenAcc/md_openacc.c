@@ -228,10 +228,7 @@ void compute ( int np, int nd, double pos[], double vel[],
 
   return;
 }
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/third
 /******************************************************************************/
 
 void initialize ( int np, int nd, double box[], int *seed, double pos[], 
