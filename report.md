@@ -89,6 +89,13 @@ At first, we could observer that the initialization from line 269-272 will occur
 In the remaining unparallelized program, we found that we could swith k and j now. After switching, we could do the parallelization under the for loop of j and we just need to do an extra reduction add to sum the result in this loop and then it could be paralleliazation.
 
 ## Section 4 Performance Model
+In this section, we choose three parameters and three different parallel methods to help us understand how the performance will be affected by different factors and by different parallel methods.
+
+The parameters are atom type, atom number, and thread number. For the parallel methods, we choose openMP, openACC, and CUDA.
+Under every method, we choose six types of atom and five different atom numbers to run the experiment. In order to get the accurate runtime, for each combination of atom type and atom number, we run 10 times and get the average runtime out of it. Hence, there are a total 300 cases tested for every program.  We weren't able to get more data due to the limited time for each program.
+
+Threads tests are only run under the openMP method.  
+
 
 ### 4.1 OpenMP
 
