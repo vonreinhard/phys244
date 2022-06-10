@@ -110,10 +110,10 @@ __global__  void add_pe(double *pe,int np,int nd,double *OUT,int j){
    sdata[tid] = pe[tid];
  }
  __syncthreads();
- for(int s=1;s<blockDim.x;s*=2){
-   if(tid%(2*s)==0){
-     sdata[tid]+=sdata[tid+s];
-   }
+ for(int s=blockDim.x/2;s>0;s/=2){
+  if(tid<s){
+    sdata[tid]+=sdata[tid+s];
+  }
    __syncthreads();
  }
  if(tid==0)pe[blockIdx.x]=sdata[0];
@@ -140,10 +140,10 @@ __global__  void add_ke(double *ke,double* vel,int np,int nd, double mass){
    sdata[tid] = ke[tid];
  }
  __syncthreads();
- for(int s=1;s<blockDim.x;s*=2){
-   if(tid%(2*s)==0){
-     sdata[tid]+=sdata[tid+s];
-   }
+ for(int s=blockDim.x/2;s>0;s/=2){
+  if(tid<s){
+    sdata[tid]+=sdata[tid+s];
+  }
    __syncthreads();
  }
  if(tid==0)ke[blockIdx.x]=sdata[0];
