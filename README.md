@@ -68,6 +68,10 @@ Batch Script submission
 To run CUDA version interactively, you need to do following commands: 
 
     # CUDA serial command
+    srun --partition=gpu-debug --pty --account=csd453 --ntasks-per-node=10 \
+--nodes=1 --mem=96G --gpus=1 -t 00:30:00 --wait=0 --export=ALL /bin/bash
+
+
     module purge
     module load slurm
     module load gpu
