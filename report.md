@@ -99,15 +99,9 @@ Threads tests are only run under the openMP method.
 
 ### 4.1 OpenMP
 ![image info](./newfolder/openmp/loopdata.png)
-<<<<<<< HEAD
 
 ![image info](./newfolder/openmp/threaddata.png)
 
-=======
-
-![image info](./newfolder/openmp/threaddata.png)
-
->>>>>>> origin/zzt
 ![image info](./newfolder/openmp/datatable.png)
 ### 4.2 OpenACC
 ![image info](./newfolder/openACC/plot.png)
@@ -119,11 +113,6 @@ Threads tests are only run under the openMP method.
 ![image info](./newfolder/cuda/datatable.png)
 
 Based on the plot and data table from the three parallel methods above, we can have a statement that the atom type will not affect the runtime. However, the atom number has a linear relationship with the runtime. The more the atom number, the larger the runtime will be. For the thread number, we figure out the relationship between runtime T and thread numbers N  as T = 0.0713N^2 - 3.0814N + 27.8097.
-<<<<<<< HEAD
-
-Beside the effect caused by different parameters, we also observe the runtime differences caused by different parallel methods. According to the graph,we have the runtime relationship as openACC > openMP > CUDA. openACC and openMP have close performance while CUDA performs much worse than the other two. The possible reason is that the j loop is not parallized and causes the unexpected performance.
-=======
->>>>>>> origin/zzt
 
 Beside the effect caused by different parameters, we also observe the runtime differences caused by different parallel methods. According to the graph,we have the runtime relationship as openACC > openMP > CUDA. openACC and openMP have close performance while CUDA performs much worse than the other two. The possible reason is that the j loop is not parallized and causes the unexpected performance.
 ## Section 5 Conclusion
